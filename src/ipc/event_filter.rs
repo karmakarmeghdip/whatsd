@@ -7,6 +7,8 @@ pub(super) fn supported_event_types() -> Vec<EventType> {
         EventType::LoggedOut,
         EventType::PairingQr,
         EventType::PairingCode,
+        EventType::Message,
+        EventType::Receipt,
     ]
 }
 

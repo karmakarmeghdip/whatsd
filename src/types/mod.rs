@@ -4,6 +4,9 @@ pub mod protocol;
 pub mod session;
 
 pub use event::{EventSubscribePayload, EventSubscriptionStatus};
-pub use message::SendTextPayload;
+pub use message::{
+    MessageEventPayload, OutgoingMessage, ReceiptEventPayload, SendMessagePayload,
+    SendMessageResultPayload, SendTextPayload,
+};
 pub use protocol::{CommandType, DaemonEvent, ErrorBody, EventType, IpcRequest, IpcResponse};
 pub use session::{DaemonPaths, DaemonStatus, PairCodePayload, SessionState, SessionStatus};

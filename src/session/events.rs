@@ -6,7 +6,10 @@ use whatsapp_rust::types::events::{ConnectFailureReason, Event};
 
 use crate::types::{DaemonEvent, EventType, SessionState};
 
-use super::manager::SessionInner;
+use super::{
+    manager::SessionInner,
+    normalize_message::{message_event_payload, receipt_event_payload},
+};
 
 pub(super) async fn normalize_event(
     event: Arc<Event>,
@@ -69,6 +72,14 @@ pub(super) async fn normalize_event(
             )
             .await
         }
+        Event::Message(message, info) => serialize_event(
+            EventType::Message,
+            message_event_payload(&account_id, message, info),
+        ),
+        Event::Receipt(receipt) => serialize_event(
+            EventType::Receipt,
+            receipt_event_payload(&account_id, receipt),
+        ),
         _ => None,
     };
 
@@ -76,6 +87,19 @@ pub(super) async fn normalize_event(
         payload["account_id"] = serde_json::Value::String(account_id);
         if event_tx.send(DaemonEvent { event, payload }).is_err() {
             debug!(?event, "no IPC subscribers for session event");
+        }
+    }
+}
+
+fn serialize_event<T: serde::Serialize>(
+    event: EventType,
+    payload: T,
+) -> Option<(EventType, serde_json::Value)> {
+    match serde_json::to_value(payload) {
+        Ok(payload) => Some((event, payload)),
+        Err(error) => {
+            debug!(%error, ?event, "failed to serialize normalized session event");
+            None
         }
     }
 }

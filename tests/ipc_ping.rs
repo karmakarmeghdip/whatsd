@@ -138,7 +138,15 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     assert_eq!(response["payload"]["subscribed"], true);
     assert_eq!(
         response["payload"]["types"].as_array().map(Vec::len),
-        Some(5)
+        Some(7)
+    );
+    assert!(
+        response["payload"]["types"]
+            .as_array()
+            .is_some_and(|types| {
+                types.contains(&serde_json::Value::String("event.message".to_owned()))
+                    && types.contains(&serde_json::Value::String("event.receipt".to_owned()))
+            })
     );
 
     let pair_code_id = Uuid::new_v4();
@@ -152,6 +160,60 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     )
     .await?;
     assert_eq!(response["id"], pair_code_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "invalid_request");
+
+    let send_text_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": send_text_id,
+            "type": "message.send_text",
+            "payload": {
+                "chat_jid": "123456789@s.whatsapp.net",
+                "text": "hello"
+            },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], send_text_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "invalid_state");
+
+    let send_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": send_id,
+            "type": "message.send",
+            "payload": {
+                "chat_jid": "123456789@s.whatsapp.net",
+                "message": {
+                    "type": "text",
+                    "text": "hello"
+                }
+            },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], send_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "invalid_state");
+
+    let bare_jid_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": bare_jid_id,
+            "type": "message.send_text",
+            "payload": {
+                "chat_jid": "123456789",
+                "text": "hello"
+            },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], bare_jid_id.to_string());
     assert_eq!(response["ok"], false);
     assert_eq!(response["error"]["code"], "invalid_request");
 

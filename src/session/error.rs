@@ -10,6 +10,8 @@ pub enum SessionError {
     StartFailed(#[source] anyhow::Error),
     #[error("failed to stop WhatsApp session")]
     StopFailed(#[source] anyhow::Error),
+    #[error("failed to send message")]
+    SendFailed(#[source] anyhow::Error),
 }
 
 impl SessionError {
@@ -19,6 +21,7 @@ impl SessionError {
             Self::InvalidState(_) => "invalid_state",
             Self::StartFailed(_) => "session_start_failed",
             Self::StopFailed(_) => "session_stop_failed",
+            Self::SendFailed(_) => "message_send_failed",
         }
     }
 }

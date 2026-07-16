@@ -1,16 +1,17 @@
 use anyhow::Context;
+use serde::de::DeserializeOwned;
 use serde_json::json;
 
 use crate::{
     session::SessionError,
     types::{
-        CommandType, ErrorBody, EventSubscribePayload, EventSubscriptionStatus, EventType,
-        IpcRequest, IpcResponse, PairCodePayload,
+        CommandType, ErrorBody, EventType, IpcRequest, IpcResponse, PairCodePayload,
+        SendMessagePayload, SendTextPayload,
     },
 };
 
-use super::event_filter::{is_supported_event_type, supported_event_types};
 use super::server::{IPC_PROTOCOL_VERSION, IpcState};
+use super::subscription::subscribe_response;
 
 pub(super) enum CommandOutcome {
     Response(IpcResponse),
@@ -88,6 +89,38 @@ pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> Com
             state.session_manager.logout().await,
             "failed to serialize session status",
         ),
+        CommandType::MessageSendText => {
+            let payload = match parse_payload::<SendTextPayload>(
+                request.id,
+                request.payload,
+                "send-text payload",
+            ) {
+                Ok(payload) => payload,
+                Err(response) => return CommandOutcome::Response(response),
+            };
+
+            session_response(
+                request.id,
+                state.session_manager.send_text(payload).await,
+                "failed to serialize send result",
+            )
+        }
+        CommandType::MessageSend => {
+            let payload = match parse_payload::<SendMessagePayload>(
+                request.id,
+                request.payload,
+                "send-message payload",
+            ) {
+                Ok(payload) => payload,
+                Err(response) => return CommandOutcome::Response(response),
+            };
+
+            session_response(
+                request.id,
+                state.session_manager.send_message(payload).await,
+                "failed to serialize send result",
+            )
+        }
         CommandType::EventSubscribe => subscribe_response(request),
         CommandType::EventUnsubscribe => CommandOutcome::Unsubscribe(IpcResponse::success(
             request.id,
@@ -105,7 +138,7 @@ pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> Com
 
 fn session_response(
     id: uuid::Uuid,
-    result: Result<crate::types::SessionStatus, SessionError>,
+    result: Result<impl serde::Serialize, SessionError>,
     serialize_context: &'static str,
 ) -> CommandOutcome {
     match result {
@@ -120,54 +153,17 @@ fn session_response(
     }
 }
 
-fn subscribe_response(request: IpcRequest) -> CommandOutcome {
-    let payload = if request.payload.is_null() {
-        EventSubscribePayload { types: Vec::new() }
-    } else {
-        match serde_json::from_value::<EventSubscribePayload>(request.payload) {
-            Ok(payload) => payload,
-            Err(error) => {
-                return CommandOutcome::Response(IpcResponse::failure(
-                    request.id,
-                    invalid_request(format!("invalid event subscription payload: {error}")),
-                ));
-            }
-        }
-    };
-
-    let selected = if payload.types.is_empty() {
-        supported_event_types()
-    } else {
-        payload.types
-    };
-
-    if let Some(event) = selected
-        .iter()
-        .find(|event| !is_supported_event_type(event))
-    {
-        return CommandOutcome::Response(IpcResponse::failure(
-            request.id,
-            invalid_request(format!(
-                "event type {event:?} is not supported in this milestone"
-            )),
-        ));
-    }
-
-    let status = EventSubscriptionStatus {
-        subscribed: true,
-        types: selected.clone(),
-    };
-
-    match serde_json::to_value(status) {
-        Ok(payload) => CommandOutcome::Subscribe {
-            response: IpcResponse::success(request.id, payload),
-            types: selected,
-        },
-        Err(error) => CommandOutcome::Response(IpcResponse::failure(
-            request.id,
-            internal_error(format!("failed to serialize subscription status: {error}")),
-        )),
-    }
+fn parse_payload<T>(
+    id: uuid::Uuid,
+    payload: serde_json::Value,
+    label: &'static str,
+) -> Result<T, IpcResponse>
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_value::<T>(payload).map_err(|error| {
+        IpcResponse::failure(id, invalid_request(format!("invalid {label}: {error}")))
+    })
 }
 
 fn unix_timestamp_seconds() -> u64 {

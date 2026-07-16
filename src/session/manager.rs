@@ -24,7 +24,7 @@ pub(super) struct SessionInner {
 }
 
 pub(super) struct RunningSession {
-    client: Arc<Client>,
+    pub(super) client: Arc<Client>,
 }
 
 impl SessionManager {
