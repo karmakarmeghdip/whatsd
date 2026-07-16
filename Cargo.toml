@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive", "env"] }
+diesel = { version = "2.3", features = ["sqlite"] }
 directories = "6"
 libc = "0.2"
 serde = { version = "1", features = ["derive"] }

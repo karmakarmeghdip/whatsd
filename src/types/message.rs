@@ -50,3 +50,46 @@ pub struct ReceiptEventPayload {
     pub is_from_me: bool,
     pub is_group: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ListMessagesPayload {
+    pub chat_jid: String,
+    #[serde(default)]
+    pub limit: Option<u32>,
+    #[serde(default)]
+    pub before_timestamp_unix_seconds: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GetMessagePayload {
+    pub chat_jid: String,
+    pub message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ListMessagesResultPayload {
+    pub messages: Vec<StoredMessagePayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StoredMessagePayload {
+    pub account_id: String,
+    pub chat_jid: String,
+    pub sender_jid: String,
+    pub message_id: String,
+    pub server_id: i32,
+    pub timestamp_unix_seconds: i64,
+    pub message_type: String,
+    pub text: Option<String>,
+    pub is_from_me: bool,
+    pub is_group: bool,
+    pub direction: String,
+    pub latest_receipt: Option<LatestReceiptPayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LatestReceiptPayload {
+    pub receipt_type: String,
+    pub timestamp_unix_seconds: i64,
+    pub sender_jid: String,
+}

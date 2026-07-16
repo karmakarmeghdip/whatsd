@@ -28,6 +28,7 @@ pub struct Config {
     pub socket_path: PathBuf,
     pub state_dir: PathBuf,
     pub database_path: PathBuf,
+    pub daemon_database_path: PathBuf,
     pub database_is_explicit: bool,
     pub log_filter: String,
     pub account_id: String,
@@ -51,11 +52,13 @@ impl Config {
         let database_path = cli
             .database
             .unwrap_or_else(|| default_database_path(&state_dir, &cli.account_id));
+        let daemon_database_path = default_daemon_database_path(&state_dir, &cli.account_id);
 
         Ok(Self {
             socket_path,
             state_dir,
             database_path,
+            daemon_database_path,
             database_is_explicit,
             log_filter: cli.log_filter,
             account_id: cli.account_id,
@@ -102,4 +105,11 @@ fn default_database_path(state_dir: &std::path::Path, account_id: &str) -> PathB
         .join("accounts")
         .join(account_id)
         .join("whatsapp.db")
+}
+
+fn default_daemon_database_path(state_dir: &std::path::Path, account_id: &str) -> PathBuf {
+    state_dir
+        .join("accounts")
+        .join(account_id)
+        .join("whatsd.db")
 }

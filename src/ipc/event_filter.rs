@@ -9,6 +9,7 @@ pub(super) fn supported_event_types() -> Vec<EventType> {
         EventType::PairingCode,
         EventType::Message,
         EventType::Receipt,
+        EventType::Error,
     ]
 }
 

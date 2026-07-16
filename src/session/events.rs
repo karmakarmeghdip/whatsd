@@ -4,17 +4,23 @@ use tokio::sync::{Mutex, broadcast};
 use tracing::debug;
 use whatsapp_rust::types::events::{ConnectFailureReason, Event};
 
-use crate::types::{DaemonEvent, EventType, SessionState};
+use crate::{
+    store::Store,
+    types::{DaemonEvent, EventType, MessageEventPayload, ReceiptEventPayload, SessionState},
+};
 
 use super::{
     manager::SessionInner,
-    normalize_message::{message_event_payload, receipt_event_payload},
+    normalize_message::{
+        message_event_payload, message_record_input, receipt_event_payload, receipt_record_input,
+    },
 };
 
 pub(super) async fn normalize_event(
     event: Arc<Event>,
     inner: Arc<Mutex<SessionInner>>,
     event_tx: broadcast::Sender<DaemonEvent>,
+    store: Store,
     account_id: String,
     generation: u64,
 ) {
@@ -72,14 +78,12 @@ pub(super) async fn normalize_event(
             )
             .await
         }
-        Event::Message(message, info) => serialize_event(
-            EventType::Message,
-            message_event_payload(&account_id, message, info),
-        ),
-        Event::Receipt(receipt) => serialize_event(
-            EventType::Receipt,
-            receipt_event_payload(&account_id, receipt),
-        ),
+        Event::Message(message, info) => {
+            persist_message_event(&store, message_event_payload(&account_id, message, info)).await
+        }
+        Event::Receipt(receipt) => {
+            persist_receipt_event(&store, receipt_event_payload(&account_id, receipt)).await
+        }
         _ => None,
     };
 
@@ -89,6 +93,62 @@ pub(super) async fn normalize_event(
             debug!(?event, "no IPC subscribers for session event");
         }
     }
+}
+
+async fn persist_message_event(
+    store: &Store,
+    payload: MessageEventPayload,
+) -> Option<(EventType, serde_json::Value)> {
+    match store
+        .upsert_message(message_record_input(&payload, "inbound"))
+        .await
+    {
+        Ok(()) => serialize_event(EventType::Message, payload),
+        Err(error) => persistence_error_event(
+            &payload.account_id,
+            "event.message",
+            Some(&payload.chat_jid),
+            Some(&payload.message_id),
+            error,
+        ),
+    }
+}
+
+async fn persist_receipt_event(
+    store: &Store,
+    payload: ReceiptEventPayload,
+) -> Option<(EventType, serde_json::Value)> {
+    match store.upsert_receipt(receipt_record_input(&payload)).await {
+        Ok(()) => serialize_event(EventType::Receipt, payload),
+        Err(error) => persistence_error_event(
+            &payload.account_id,
+            "event.receipt",
+            Some(&payload.chat_jid),
+            payload.message_ids.first().map(String::as_str),
+            error,
+        ),
+    }
+}
+
+fn persistence_error_event(
+    account_id: &str,
+    source_event: &str,
+    chat_jid: Option<&str>,
+    message_id: Option<&str>,
+    error: anyhow::Error,
+) -> Option<(EventType, serde_json::Value)> {
+    debug!(%error, source_event, "failed to persist inbound event");
+    Some((
+        EventType::Error,
+        serde_json::json!({
+            "account_id": account_id,
+            "code": "store_write_failed",
+            "message": "failed to persist inbound event",
+            "source_event": source_event,
+            "chat_jid": chat_jid,
+            "message_id": message_id,
+        }),
+    ))
 }
 
 fn serialize_event<T: serde::Serialize>(

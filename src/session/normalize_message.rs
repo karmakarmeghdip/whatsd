@@ -6,7 +6,10 @@ use whatsapp_rust::{
     waproto::whatsapp as wa,
 };
 
-use crate::types::{MessageEventPayload, ReceiptEventPayload};
+use crate::{
+    store::{MessageRecordInput, ReceiptRecordInput},
+    types::{MessageEventPayload, ReceiptEventPayload},
+};
 
 pub(super) fn message_event_payload(
     account_id: &str,
@@ -27,6 +30,25 @@ pub(super) fn message_event_payload(
     }
 }
 
+pub(super) fn message_record_input(
+    payload: &MessageEventPayload,
+    direction: &str,
+) -> MessageRecordInput {
+    MessageRecordInput {
+        account_id: payload.account_id.clone(),
+        chat_jid: payload.chat_jid.clone(),
+        sender_jid: payload.sender_jid.clone(),
+        message_id: payload.message_id.clone(),
+        server_id: payload.server_id,
+        timestamp_unix_seconds: payload.timestamp_unix_seconds,
+        message_type: payload.message_type.clone(),
+        text: payload.text.clone(),
+        is_from_me: payload.is_from_me,
+        is_group: payload.is_group,
+        direction: direction.to_owned(),
+    }
+}
+
 pub(super) fn receipt_event_payload(account_id: &str, receipt: &Receipt) -> ReceiptEventPayload {
     ReceiptEventPayload {
         account_id: account_id.to_owned(),
@@ -37,6 +59,19 @@ pub(super) fn receipt_event_payload(account_id: &str, receipt: &Receipt) -> Rece
         receipt_type: receipt_type_name(&receipt.r#type),
         is_from_me: receipt.source.is_from_me,
         is_group: receipt.source.is_group,
+    }
+}
+
+pub(super) fn receipt_record_input(payload: &ReceiptEventPayload) -> ReceiptRecordInput {
+    ReceiptRecordInput {
+        account_id: payload.account_id.clone(),
+        chat_jid: payload.chat_jid.clone(),
+        sender_jid: payload.sender_jid.clone(),
+        message_ids: payload.message_ids.clone(),
+        timestamp_unix_seconds: payload.timestamp_unix_seconds,
+        receipt_type: payload.receipt_type.clone(),
+        is_from_me: payload.is_from_me,
+        is_group: payload.is_group,
     }
 }
 

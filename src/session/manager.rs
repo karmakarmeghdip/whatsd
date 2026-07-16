@@ -4,7 +4,10 @@ use tokio::sync::{Mutex, broadcast};
 use tracing::debug;
 use whatsapp_rust::{Client, bot::BotHandle, pair_code::PairCodeOptions};
 
-use crate::types::{DaemonEvent, EventType, PairCodePayload, SessionState, SessionStatus};
+use crate::{
+    store::Store,
+    types::{DaemonEvent, EventType, PairCodePayload, SessionState, SessionStatus},
+};
 
 use super::{error::SessionError, pair_code::pair_code_options};
 
@@ -13,6 +16,7 @@ pub struct SessionManager {
     pub(super) account_id: String,
     pub(super) database_path: PathBuf,
     pub(super) database_is_explicit: bool,
+    pub(super) store: Store,
     pub(super) inner: Arc<Mutex<SessionInner>>,
     pub(super) events: broadcast::Sender<DaemonEvent>,
 }
@@ -28,13 +32,19 @@ pub(super) struct RunningSession {
 }
 
 impl SessionManager {
-    pub fn new(account_id: String, database_path: PathBuf, database_is_explicit: bool) -> Self {
+    pub fn new(
+        account_id: String,
+        database_path: PathBuf,
+        database_is_explicit: bool,
+        store: Store,
+    ) -> Self {
         let (events, _rx) = broadcast::channel(128);
 
         Self {
             account_id,
             database_path,
             database_is_explicit,
+            store,
             inner: Arc::new(Mutex::new(SessionInner {
                 state: SessionState::Disconnected,
                 running: None,

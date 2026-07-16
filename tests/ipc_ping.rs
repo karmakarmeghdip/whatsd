@@ -74,6 +74,7 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     let config = test_config(&test_dir);
     let socket_path = config.socket_path.clone();
     let expected_database = config.database_path.to_string_lossy().into_owned();
+    let expected_daemon_database = config.daemon_database_path.to_string_lossy().into_owned();
 
     let daemon_task = tokio::spawn(async move { daemon::run(config).await });
     let stream = connect_with_retry(&socket_path).await?;
@@ -107,6 +108,10 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     assert_eq!(response["id"], daemon_status_id.to_string());
     assert_eq!(response["ok"], true);
     assert_eq!(response["payload"]["paths"]["database"], expected_database);
+    assert_eq!(
+        response["payload"]["paths"]["daemon_database"],
+        expected_daemon_database
+    );
     assert_eq!(response["payload"]["session"]["state"], "disconnected");
 
     let subscribe_id = Uuid::new_v4();
@@ -138,7 +143,7 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     assert_eq!(response["payload"]["subscribed"], true);
     assert_eq!(
         response["payload"]["types"].as_array().map(Vec::len),
-        Some(7)
+        Some(8)
     );
     assert!(
         response["payload"]["types"]
@@ -217,6 +222,43 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     assert_eq!(response["ok"], false);
     assert_eq!(response["error"]["code"], "invalid_request");
 
+    let list_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": list_id,
+            "type": "message.list",
+            "payload": {
+                "chat_jid": "123456789@s.whatsapp.net",
+                "limit": 10
+            },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], list_id.to_string());
+    assert_eq!(response["ok"], true);
+    assert_eq!(
+        response["payload"]["messages"].as_array().map(Vec::len),
+        Some(0)
+    );
+
+    let get_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": get_id,
+            "type": "message.get",
+            "payload": {
+                "chat_jid": "123456789@s.whatsapp.net",
+                "message_id": "missing"
+            },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], get_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "not_found");
+
     let unsubscribe_id = Uuid::new_v4();
     let response = request_response(
         &mut reader,
@@ -244,11 +286,13 @@ fn test_config(test_dir: &Path) -> Config {
         .join("accounts")
         .join("default")
         .join("whatsapp.db");
+    let daemon_database_path = state_dir.join("accounts").join("default").join("whatsd.db");
 
     Config {
         socket_path: test_dir.join("run").join("whatsd.sock"),
         state_dir,
         database_path,
+        daemon_database_path,
         database_is_explicit: false,
         log_filter: "off".to_owned(),
         account_id: "default".to_owned(),

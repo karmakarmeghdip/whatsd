@@ -14,6 +14,7 @@ pub struct DaemonPaths {
     pub socket: String,
     pub state_dir: String,
     pub database: String,
+    pub daemon_database: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

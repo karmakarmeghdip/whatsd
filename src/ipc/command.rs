@@ -5,8 +5,8 @@ use serde_json::json;
 use crate::{
     session::SessionError,
     types::{
-        CommandType, ErrorBody, EventType, IpcRequest, IpcResponse, PairCodePayload,
-        SendMessagePayload, SendTextPayload,
+        CommandType, ErrorBody, EventType, GetMessagePayload, IpcRequest, IpcResponse,
+        ListMessagesPayload, PairCodePayload, SendMessagePayload, SendTextPayload,
     },
 };
 
@@ -121,6 +121,45 @@ pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> Com
                 "failed to serialize send result",
             )
         }
+        CommandType::MessageList => {
+            let payload = match parse_payload::<ListMessagesPayload>(
+                request.id,
+                request.payload,
+                "message-list payload",
+            ) {
+                Ok(payload) => payload,
+                Err(response) => return CommandOutcome::Response(response),
+            };
+
+            session_response(
+                request.id,
+                state.session_manager.list_messages(payload).await,
+                "failed to serialize message list",
+            )
+        }
+        CommandType::MessageGet => {
+            let payload = match parse_payload::<GetMessagePayload>(
+                request.id,
+                request.payload,
+                "message-get payload",
+            ) {
+                Ok(payload) => payload,
+                Err(response) => return CommandOutcome::Response(response),
+            };
+
+            match state.session_manager.get_message(payload).await {
+                Ok(Some(message)) => {
+                    session_response(request.id, Ok(message), "failed to serialize message")
+                }
+                Ok(None) => CommandOutcome::Response(IpcResponse::failure(
+                    request.id,
+                    not_found("message not found"),
+                )),
+                Err(error) => {
+                    CommandOutcome::Response(IpcResponse::failure(request.id, session_error(error)))
+                }
+            }
+        }
         CommandType::EventSubscribe => subscribe_response(request),
         CommandType::EventUnsubscribe => CommandOutcome::Unsubscribe(IpcResponse::success(
             request.id,
@@ -183,6 +222,13 @@ fn internal_error(message: String) -> ErrorBody {
     ErrorBody {
         code: "internal_error".to_owned(),
         message,
+    }
+}
+
+fn not_found(message: &str) -> ErrorBody {
+    ErrorBody {
+        code: "not_found".to_owned(),
+        message: message.to_owned(),
     }
 }
 

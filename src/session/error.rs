@@ -12,6 +12,8 @@ pub enum SessionError {
     StopFailed(#[source] anyhow::Error),
     #[error("failed to send message")]
     SendFailed(#[source] anyhow::Error),
+    #[error("daemon store operation failed")]
+    StoreFailed(#[source] anyhow::Error),
 }
 
 impl SessionError {
@@ -22,6 +24,7 @@ impl SessionError {
             Self::StartFailed(_) => "session_start_failed",
             Self::StopFailed(_) => "session_stop_failed",
             Self::SendFailed(_) => "message_send_failed",
+            Self::StoreFailed(_) => "store_error",
         }
     }
 }

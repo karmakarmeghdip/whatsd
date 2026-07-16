@@ -24,6 +24,7 @@ impl SessionManager {
         let backend = Arc::new(SqliteStore::new(&database).await?) as Arc<dyn Backend>;
         let event_inner = Arc::clone(&self.inner);
         let event_tx = self.events.clone();
+        let event_store = self.store.clone();
         let account_id = self.account_id.clone();
 
         let mut builder = Bot::builder()
@@ -34,10 +35,19 @@ impl SessionManager {
             .on_event(move |event, _client| {
                 let event_inner = Arc::clone(&event_inner);
                 let event_tx = event_tx.clone();
+                let event_store = event_store.clone();
                 let account_id = account_id.clone();
 
                 async move {
-                    normalize_event(event, event_inner, event_tx, account_id, generation).await;
+                    normalize_event(
+                        event,
+                        event_inner,
+                        event_tx,
+                        event_store,
+                        account_id,
+                        generation,
+                    )
+                    .await;
                 }
             });
 

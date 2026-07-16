@@ -92,6 +92,7 @@ impl IpcState {
                 socket: path_to_string(&self.config.socket_path),
                 state_dir: path_to_string(&self.config.state_dir),
                 database: path_to_string(&self.config.database_path),
+                daemon_database: path_to_string(&self.config.daemon_database_path),
             },
             session: self.session_manager.status().await,
         }
