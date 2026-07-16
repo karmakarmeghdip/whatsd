@@ -22,6 +22,13 @@ pub struct SessionStatus {
     pub state: SessionState,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct PairCodePayload {
+    pub phone_number: String,
+    #[serde(default)]
+    pub custom_code: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionState {

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use tokio::sync::watch;
 use tracing::info;
 
-use crate::{config::Config, ipc::IpcServer, unix::ensure_private_dir};
+use crate::{config::Config, ipc::IpcServer, session::SessionManager, unix::ensure_private_dir};
 
 pub async fn run(config: Config) -> Result<()> {
     ensure_private_dir(&config.state_dir, "state directory")
@@ -13,8 +13,18 @@ pub async fn run(config: Config) -> Result<()> {
 
     let started_at = Instant::now();
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let session_manager = SessionManager::new(
+        config.account_id.clone(),
+        config.database_path.clone(),
+        config.database_is_explicit,
+    );
 
-    let server = IpcServer::new(config, started_at, shutdown_tx.clone());
+    let server = IpcServer::new(
+        config,
+        started_at,
+        shutdown_tx.clone(),
+        session_manager.clone(),
+    );
     let mut server_task = tokio::spawn(async move { server.run(shutdown_rx).await });
     let mut shutdown_rx = shutdown_tx.subscribe();
 
@@ -34,6 +44,7 @@ pub async fn run(config: Config) -> Result<()> {
     }
 
     let _ = shutdown_tx.send(true);
+    session_manager.shutdown().await;
     server_task.await.context("IPC server task failed")??;
 
     Ok(())

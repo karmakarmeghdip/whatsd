@@ -6,29 +6,38 @@ use tracing::{info, warn};
 
 use crate::{
     config::Config,
-    types::{DaemonPaths, DaemonStatus, SessionState, SessionStatus},
+    session::SessionManager,
+    types::{DaemonPaths, DaemonStatus},
 };
 
 use super::{connection::handle_connection, socket};
 
 pub(super) const IPC_PROTOCOL_VERSION: u32 = 1;
 
-#[derive(Debug)]
 pub struct IpcServer {
     state: Arc<IpcState>,
     shutdown_tx: watch::Sender<bool>,
 }
 
-#[derive(Debug)]
 pub(super) struct IpcState {
     config: Config,
     started_at: Instant,
+    pub(super) session_manager: SessionManager,
 }
 
 impl IpcServer {
-    pub fn new(config: Config, started_at: Instant, shutdown_tx: watch::Sender<bool>) -> Self {
+    pub fn new(
+        config: Config,
+        started_at: Instant,
+        shutdown_tx: watch::Sender<bool>,
+        session_manager: SessionManager,
+    ) -> Self {
         Self {
-            state: Arc::new(IpcState { config, started_at }),
+            state: Arc::new(IpcState {
+                config,
+                started_at,
+                session_manager,
+            }),
             shutdown_tx,
         }
     }
@@ -74,7 +83,7 @@ impl IpcServer {
 }
 
 impl IpcState {
-    pub(super) fn daemon_status(&self) -> DaemonStatus {
+    pub(super) async fn daemon_status(&self) -> DaemonStatus {
         DaemonStatus {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             protocol_version: IPC_PROTOCOL_VERSION,
@@ -84,10 +93,7 @@ impl IpcState {
                 state_dir: path_to_string(&self.config.state_dir),
                 database: path_to_string(&self.config.database_path),
             },
-            session: SessionStatus {
-                account_id: self.config.account_id.clone(),
-                state: SessionState::Disconnected,
-            },
+            session: self.session_manager.status().await,
         }
     }
 }

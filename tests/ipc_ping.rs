@@ -13,17 +13,8 @@ use whatsd::{config::Config, daemon};
 #[tokio::test]
 async fn daemon_ping_over_unix_socket() -> Result<()> {
     let test_dir = make_test_dir()?;
-    let socket_path = test_dir.join("run").join("whatsd.sock");
-    let state_dir = test_dir.join("state");
-    let database_path = state_dir.join("whatsapp.db");
-
-    let config = Config {
-        socket_path: socket_path.clone(),
-        state_dir,
-        database_path,
-        log_filter: "off".to_owned(),
-        account_id: "default".to_owned(),
-    };
+    let config = test_config(&test_dir);
+    let socket_path = config.socket_path.clone();
 
     let daemon_task = tokio::spawn(async move { daemon::run(config).await });
     let stream = connect_with_retry(&socket_path).await?;
@@ -38,7 +29,7 @@ async fn daemon_ping_over_unix_socket() -> Result<()> {
             "payload": {},
         }),
     )
-        .await?;
+    .await?;
 
     let mut response_line = String::new();
     reader
@@ -60,7 +51,7 @@ async fn daemon_ping_over_unix_socket() -> Result<()> {
             "payload": {},
         }),
     )
-        .await?;
+    .await?;
 
     response_line.clear();
     reader
@@ -75,6 +66,131 @@ async fn daemon_ping_over_unix_socket() -> Result<()> {
     fs::remove_dir_all(test_dir).context("failed to remove test directory")?;
 
     Ok(())
+}
+
+#[tokio::test]
+async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> {
+    let test_dir = make_test_dir()?;
+    let config = test_config(&test_dir);
+    let socket_path = config.socket_path.clone();
+    let expected_database = config.database_path.to_string_lossy().into_owned();
+
+    let daemon_task = tokio::spawn(async move { daemon::run(config).await });
+    let stream = connect_with_retry(&socket_path).await?;
+    let mut reader = BufReader::new(stream);
+
+    let status_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": status_id,
+            "type": "session.status",
+            "payload": {},
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], status_id.to_string());
+    assert_eq!(response["ok"], true);
+    assert_eq!(response["payload"]["account_id"], "default");
+    assert_eq!(response["payload"]["state"], "disconnected");
+
+    let daemon_status_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": daemon_status_id,
+            "type": "daemon.status",
+            "payload": {},
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], daemon_status_id.to_string());
+    assert_eq!(response["ok"], true);
+    assert_eq!(response["payload"]["paths"]["database"], expected_database);
+    assert_eq!(response["payload"]["session"]["state"], "disconnected");
+
+    let subscribe_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": subscribe_id,
+            "type": "event.subscribe",
+            "payload": { "types": ["event.connected"] },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], subscribe_id.to_string());
+    assert_eq!(response["ok"], true);
+    assert_eq!(response["payload"]["subscribed"], true);
+    assert_eq!(response["payload"]["types"][0], "event.connected");
+
+    let subscribe_all_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": subscribe_all_id,
+            "type": "event.subscribe",
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], subscribe_all_id.to_string());
+    assert_eq!(response["ok"], true);
+    assert_eq!(response["payload"]["subscribed"], true);
+    assert_eq!(
+        response["payload"]["types"].as_array().map(Vec::len),
+        Some(5)
+    );
+
+    let pair_code_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": pair_code_id,
+            "type": "session.pair_code",
+            "payload": { "phone_number": "" },
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], pair_code_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "invalid_request");
+
+    let unsubscribe_id = Uuid::new_v4();
+    let response = request_response(
+        &mut reader,
+        json!({
+            "id": unsubscribe_id,
+            "type": "event.unsubscribe",
+            "payload": {},
+        }),
+    )
+    .await?;
+    assert_eq!(response["id"], unsubscribe_id.to_string());
+    assert_eq!(response["ok"], true);
+    assert_eq!(response["payload"]["subscribed"], false);
+
+    shutdown_daemon(&mut reader).await?;
+    daemon_task.await.context("daemon task failed")??;
+    fs::remove_dir_all(test_dir).context("failed to remove test directory")?;
+
+    Ok(())
+}
+
+fn test_config(test_dir: &Path) -> Config {
+    let state_dir = test_dir.join("state");
+    let database_path = state_dir
+        .join("accounts")
+        .join("default")
+        .join("whatsapp.db");
+
+    Config {
+        socket_path: test_dir.join("run").join("whatsd.sock"),
+        state_dir,
+        database_path,
+        database_is_explicit: false,
+        log_filter: "off".to_owned(),
+        account_id: "default".to_owned(),
+    }
 }
 
 fn make_test_dir() -> Result<std::path::PathBuf> {
@@ -109,5 +225,37 @@ async fn write_json_line(stream: &mut UnixStream, value: serde_json::Value) -> R
         .await
         .context("failed to write request")?;
     stream.flush().await.context("failed to flush request")?;
+    Ok(())
+}
+
+async fn request_response(
+    reader: &mut BufReader<UnixStream>,
+    request: serde_json::Value,
+) -> Result<serde_json::Value> {
+    write_json_line(reader.get_mut(), request).await?;
+
+    let mut response_line = String::new();
+    reader
+        .read_line(&mut response_line)
+        .await
+        .context("failed to read response")?;
+
+    serde_json::from_str(&response_line).context("failed to parse response")
+}
+
+async fn shutdown_daemon(reader: &mut BufReader<UnixStream>) -> Result<()> {
+    let shutdown_id = Uuid::new_v4();
+    let response = request_response(
+        reader,
+        json!({
+            "id": shutdown_id,
+            "type": "daemon.shutdown",
+            "payload": {},
+        }),
+    )
+    .await?;
+
+    assert_eq!(response["id"], shutdown_id.to_string());
+    assert_eq!(response["ok"], true);
     Ok(())
 }

@@ -28,6 +28,7 @@ pub struct Config {
     pub socket_path: PathBuf,
     pub state_dir: PathBuf,
     pub database_path: PathBuf,
+    pub database_is_explicit: bool,
     pub log_filter: String,
     pub account_id: String,
 }
@@ -44,18 +45,37 @@ impl Config {
             None => default_socket_path()?,
         };
 
+        validate_account_id(&cli.account_id)?;
+
+        let database_is_explicit = cli.database.is_some();
         let database_path = cli
             .database
-            .unwrap_or_else(|| state_dir.join("whatsapp.db"));
+            .unwrap_or_else(|| default_database_path(&state_dir, &cli.account_id));
 
         Ok(Self {
             socket_path,
             state_dir,
             database_path,
+            database_is_explicit,
             log_filter: cli.log_filter,
             account_id: cli.account_id,
         })
     }
+}
+
+fn validate_account_id(account_id: &str) -> Result<()> {
+    if account_id.is_empty() || matches!(account_id, "." | "..") {
+        anyhow::bail!("account_id must be a safe non-empty path component");
+    }
+
+    if !account_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+    {
+        anyhow::bail!("account_id may only contain ASCII letters, digits, '_', '-', and '.'");
+    }
+
+    Ok(())
 }
 
 fn default_socket_path() -> Result<PathBuf> {
@@ -75,4 +95,11 @@ fn default_state_dir() -> Result<PathBuf> {
         .state_dir()
         .context("XDG_STATE_HOME could not be resolved")?
         .to_path_buf())
+}
+
+fn default_database_path(state_dir: &std::path::Path, account_id: &str) -> PathBuf {
+    state_dir
+        .join("accounts")
+        .join(account_id)
+        .join("whatsapp.db")
 }
