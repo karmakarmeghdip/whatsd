@@ -3,11 +3,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DaemonStatus {
     pub version: String,
+    pub protocol_version: u32,
+    pub uptime_seconds: u64,
+    pub paths: DaemonPaths,
     pub session: SessionStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DaemonPaths {
+    pub socket: String,
+    pub state_dir: String,
+    pub database: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SessionStatus {
+    pub account_id: String,
     pub state: SessionState,
 }
 

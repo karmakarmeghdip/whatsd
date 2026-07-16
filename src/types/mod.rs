@@ -4,4 +4,4 @@ pub mod session;
 
 pub use message::SendTextPayload;
 pub use protocol::{CommandType, DaemonEvent, ErrorBody, EventType, IpcRequest, IpcResponse};
-pub use session::{DaemonStatus, SessionState, SessionStatus};
+pub use session::{DaemonPaths, DaemonStatus, SessionState, SessionStatus};

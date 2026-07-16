@@ -79,10 +79,38 @@ pub enum CommandType {
     SessionPairCode,
     #[serde(rename = "message.send_text")]
     MessageSendText,
+    #[serde(rename = "message.send")]
+    MessageSend,
+    #[serde(rename = "message.react")]
+    MessageReact,
+    #[serde(rename = "message.edit")]
+    MessageEdit,
+    #[serde(rename = "message.revoke")]
+    MessageRevoke,
+    #[serde(rename = "message.mark_read")]
+    MessageMarkRead,
+    #[serde(rename = "message.list")]
+    MessageList,
+    #[serde(rename = "message.get")]
+    MessageGet,
     #[serde(rename = "event.subscribe")]
     EventSubscribe,
     #[serde(rename = "event.unsubscribe")]
     EventUnsubscribe,
+    #[serde(rename = "chat.list")]
+    ChatList,
+    #[serde(rename = "chat.get")]
+    ChatGet,
+    #[serde(rename = "chat.archive")]
+    ChatArchive,
+    #[serde(rename = "chat.pin")]
+    ChatPin,
+    #[serde(rename = "chat.mute")]
+    ChatMute,
+    #[serde(rename = "contact.list")]
+    ContactList,
+    #[serde(rename = "contact.get")]
+    ContactGet,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -101,6 +129,14 @@ pub enum EventType {
     Message,
     #[serde(rename = "event.receipt")]
     Receipt,
+    #[serde(rename = "event.presence")]
+    Presence,
+    #[serde(rename = "event.chat_update")]
+    ChatUpdate,
+    #[serde(rename = "event.group_update")]
+    GroupUpdate,
+    #[serde(rename = "event.history_sync_progress")]
+    HistorySyncProgress,
     #[serde(rename = "event.error")]
     Error,
 }
