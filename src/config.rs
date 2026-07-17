@@ -13,6 +13,9 @@ pub struct Cli {
     #[arg(long, env = "WHATSD_STATE_DIR")]
     pub state_dir: Option<PathBuf>,
 
+    #[arg(long, env = "WHATSD_CACHE_DIR")]
+    pub cache_dir: Option<PathBuf>,
+
     #[arg(long, env = "WHATSD_DATABASE")]
     pub database: Option<PathBuf>,
 
@@ -27,6 +30,7 @@ pub struct Cli {
 pub struct Config {
     pub socket_path: PathBuf,
     pub state_dir: PathBuf,
+    pub cache_dir: PathBuf,
     pub database_path: PathBuf,
     pub daemon_database_path: PathBuf,
     pub database_is_explicit: bool,
@@ -46,6 +50,11 @@ impl Config {
             None => default_socket_path()?,
         };
 
+        let cache_dir = match cli.cache_dir {
+            Some(path) => path,
+            None => default_cache_dir()?,
+        };
+
         validate_account_id(&cli.account_id)?;
 
         let database_is_explicit = cli.database.is_some();
@@ -57,6 +66,7 @@ impl Config {
         Ok(Self {
             socket_path,
             state_dir,
+            cache_dir,
             database_path,
             daemon_database_path,
             database_is_explicit,
@@ -98,6 +108,13 @@ fn default_state_dir() -> Result<PathBuf> {
         .state_dir()
         .context("XDG_STATE_HOME could not be resolved")?
         .to_path_buf())
+}
+
+fn default_cache_dir() -> Result<PathBuf> {
+    let project_dirs =
+        ProjectDirs::from("", "", "whatsd").context("failed to determine project directories")?;
+
+    Ok(project_dirs.cache_dir().to_path_buf())
 }
 
 fn default_database_path(state_dir: &std::path::Path, account_id: &str) -> PathBuf {

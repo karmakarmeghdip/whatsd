@@ -13,6 +13,7 @@ pub struct DaemonStatus {
 pub struct DaemonPaths {
     pub socket: String,
     pub state_dir: String,
+    pub cache_dir: String,
     pub database: String,
     pub daemon_database: String,
 }

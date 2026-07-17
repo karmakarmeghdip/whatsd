@@ -119,26 +119,34 @@ impl SessionManager {
 }
 
 pub(super) fn parse_full_jid(chat_jid: &str) -> Result<Jid, SessionError> {
-    validate_full_jid(chat_jid)?;
-    Jid::from_str(chat_jid).map_err(|_error| invalid_chat_jid())
+    parse_full_jid_field(chat_jid, "chat_jid")
+}
+
+pub(super) fn parse_full_jid_field(jid: &str, field_name: &str) -> Result<Jid, SessionError> {
+    validate_full_jid_field(jid, field_name)?;
+    Jid::from_str(jid).map_err(|_error| invalid_jid(field_name))
 }
 
 pub(super) fn validate_full_jid(chat_jid: &str) -> Result<(), SessionError> {
-    let Some((user, _server)) = chat_jid.split_once('@') else {
-        return Err(invalid_chat_jid());
+    validate_full_jid_field(chat_jid, "chat_jid")
+}
+
+fn validate_full_jid_field(jid: &str, field_name: &str) -> Result<(), SessionError> {
+    let Some((user, _server)) = jid.split_once('@') else {
+        return Err(invalid_jid(field_name));
     };
 
     if user.is_empty() {
-        return Err(invalid_chat_jid());
+        return Err(invalid_jid(field_name));
     }
 
-    Jid::from_str(chat_jid)
+    Jid::from_str(jid)
         .map(|_| ())
-        .map_err(|_error| invalid_chat_jid())
+        .map_err(|_error| invalid_jid(field_name))
 }
 
-fn invalid_chat_jid() -> SessionError {
-    SessionError::InvalidRequest("chat_jid must be a valid full WhatsApp JID".to_owned())
+fn invalid_jid(field_name: &str) -> SessionError {
+    SessionError::InvalidRequest(format!("{field_name} must be a valid full WhatsApp JID"))
 }
 
 fn is_group_chat(chat_jid: &str) -> bool {

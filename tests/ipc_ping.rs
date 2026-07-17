@@ -75,6 +75,7 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     let socket_path = config.socket_path.clone();
     let expected_database = config.database_path.to_string_lossy().into_owned();
     let expected_daemon_database = config.daemon_database_path.to_string_lossy().into_owned();
+    let expected_cache_dir = config.cache_dir.to_string_lossy().into_owned();
 
     let daemon_task = tokio::spawn(async move { daemon::run(config).await });
     let stream = connect_with_retry(&socket_path).await?;
@@ -108,6 +109,10 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     assert_eq!(response["id"], daemon_status_id.to_string());
     assert_eq!(response["ok"], true);
     assert_eq!(response["payload"]["paths"]["database"], expected_database);
+    assert_eq!(
+        response["payload"]["paths"]["cache_dir"],
+        expected_cache_dir
+    );
     assert_eq!(
         response["payload"]["paths"]["daemon_database"],
         expected_daemon_database
@@ -325,6 +330,31 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
         }),
     )
     .await?;
+    assert_invalid_state(
+        &mut reader,
+        "contact.get",
+        json!({ "jid": "123456789@s.whatsapp.net" }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "contact.profile_picture",
+        json!({ "jid": "123456789@s.whatsapp.net", "preview": true }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "media.download",
+        media_download_payload("images/msg-1.jpg"),
+    )
+    .await?;
+    assert_error_code(
+        &mut reader,
+        "media.download",
+        media_download_payload("../outside.jpg"),
+        "invalid_request",
+    )
+    .await?;
 
     let unsubscribe_id = Uuid::new_v4();
     let response = request_response(
@@ -349,6 +379,7 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
 
 fn test_config(test_dir: &Path) -> Config {
     let state_dir = test_dir.join("state");
+    let cache_dir = test_dir.join("cache");
     let database_path = state_dir
         .join("accounts")
         .join("default")
@@ -358,6 +389,7 @@ fn test_config(test_dir: &Path) -> Config {
     Config {
         socket_path: test_dir.join("run").join("whatsd.sock"),
         state_dir,
+        cache_dir,
         database_path,
         daemon_database_path,
         database_is_explicit: false,
@@ -453,4 +485,42 @@ async fn assert_invalid_state(
     assert_eq!(response["ok"], false);
     assert_eq!(response["error"]["code"], "invalid_state");
     Ok(())
+}
+
+async fn assert_error_code(
+    reader: &mut BufReader<UnixStream>,
+    command: &str,
+    payload: serde_json::Value,
+    code: &str,
+) -> Result<()> {
+    let request_id = Uuid::new_v4();
+    let response = request_response(
+        reader,
+        json!({
+            "id": request_id,
+            "type": command,
+            "payload": payload,
+        }),
+    )
+    .await?;
+
+    assert_eq!(response["id"], request_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], code);
+    Ok(())
+}
+
+fn media_download_payload(relative_path: &str) -> serde_json::Value {
+    let hash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    json!({
+        "relative_path": relative_path,
+        "media": {
+            "type": "image",
+            "direct_path": "/v/t62.7118-24/example",
+            "media_key": hash,
+            "file_sha256": hash,
+            "file_enc_sha256": hash,
+            "file_length": 1
+        }
+    })
 }

@@ -12,6 +12,9 @@ pub async fn run(config: Config) -> Result<()> {
     ensure_private_dir(&config.state_dir, "state directory")
         .await
         .context("failed to prepare state directory")?;
+    ensure_private_dir(&config.cache_dir, "cache directory")
+        .await
+        .context("failed to prepare cache directory")?;
 
     let started_at = Instant::now();
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -22,6 +25,7 @@ pub async fn run(config: Config) -> Result<()> {
         config.account_id.clone(),
         config.database_path.clone(),
         config.database_is_explicit,
+        config.cache_dir.clone(),
         store,
     );
 

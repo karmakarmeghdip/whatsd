@@ -8,6 +8,8 @@ use crate::{
 };
 
 use super::{
+    contact_commands::{handle_contact_request, is_contact_command},
+    media_commands::{handle_media_request, is_media_command},
     message_commands::{handle_message_request, is_message_command},
     presence_commands::{handle_presence_request, is_presence_command},
     server::{IPC_PROTOCOL_VERSION, IpcState},
@@ -27,6 +29,14 @@ pub(super) enum CommandOutcome {
 pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> CommandOutcome {
     if is_message_command(request.command) {
         return handle_message_request(request, state).await;
+    }
+
+    if is_contact_command(request.command) {
+        return handle_contact_request(request, state).await;
+    }
+
+    if is_media_command(request.command) {
+        return handle_media_request(request, state).await;
     }
 
     if is_presence_command(request.command) {

@@ -1,8 +1,10 @@
 mod actions;
 mod bot;
+mod contacts;
 mod error;
 mod events;
 mod manager;
+mod media;
 mod messages;
 mod normalize_message;
 mod pair_code;

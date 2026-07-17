@@ -16,6 +16,7 @@ pub struct SessionManager {
     pub(super) account_id: String,
     pub(super) database_path: PathBuf,
     pub(super) database_is_explicit: bool,
+    pub(super) cache_dir: PathBuf,
     pub(super) store: Store,
     pub(super) inner: Arc<Mutex<SessionInner>>,
     pub(super) events: broadcast::Sender<DaemonEvent>,
@@ -36,6 +37,7 @@ impl SessionManager {
         account_id: String,
         database_path: PathBuf,
         database_is_explicit: bool,
+        cache_dir: PathBuf,
         store: Store,
     ) -> Self {
         let (events, _rx) = broadcast::channel(128);
@@ -44,6 +46,7 @@ impl SessionManager {
             account_id,
             database_path,
             database_is_explicit,
+            cache_dir,
             store,
             inner: Arc::new(Mutex::new(SessionInner {
                 state: SessionState::Disconnected,

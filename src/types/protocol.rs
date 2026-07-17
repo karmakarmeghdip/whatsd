@@ -93,6 +93,8 @@ pub enum CommandType {
     MessageList,
     #[serde(rename = "message.get")]
     MessageGet,
+    #[serde(rename = "media.download")]
+    MediaDownload,
     #[serde(rename = "event.subscribe")]
     EventSubscribe,
     #[serde(rename = "event.unsubscribe")]
@@ -111,6 +113,8 @@ pub enum CommandType {
     ContactList,
     #[serde(rename = "contact.get")]
     ContactGet,
+    #[serde(rename = "contact.profile_picture")]
+    ContactProfilePicture,
     #[serde(rename = "presence.set")]
     PresenceSet,
     #[serde(rename = "presence.subscribe")]

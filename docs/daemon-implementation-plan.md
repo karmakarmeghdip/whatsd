@@ -208,6 +208,7 @@ Messages:
 ```text
 message.send_text
 message.send
+media.download
 message.react
 message.edit
 message.revoke
@@ -233,7 +234,10 @@ chat.pin
 chat.mute
 contact.list
 contact.get
+contact.profile_picture
 ```
+
+Initial media download support writes files under the daemon cache directory only. Clients provide a relative cache path plus explicit WhatsApp media CDN metadata; the daemon rejects absolute paths and `.`/`..` components.
 
 Groups and newsletters can be a second milestone after the basic session/message loop is reliable.
 
