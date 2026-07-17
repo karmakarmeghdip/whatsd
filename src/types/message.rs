@@ -93,3 +93,36 @@ pub struct LatestReceiptPayload {
     pub timestamp_unix_seconds: i64,
     pub sender_jid: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MessageReactPayload {
+    pub chat_jid: String,
+    pub message_id: String,
+    pub emoji: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MessageEditPayload {
+    pub chat_jid: String,
+    pub message_id: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MessageRevokePayload {
+    pub chat_jid: String,
+    pub message_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MessageMarkReadPayload {
+    pub chat_jid: String,
+    pub message_ids: Vec<String>,
+    #[serde(default)]
+    pub sender_jid: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ActionStatusPayload {
+    pub status: String,
+}

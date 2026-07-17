@@ -259,6 +259,73 @@ async fn session_status_and_event_subscription_over_unix_socket() -> Result<()> 
     assert_eq!(response["ok"], false);
     assert_eq!(response["error"]["code"], "not_found");
 
+    assert_invalid_state(
+        &mut reader,
+        "message.react",
+        json!({
+            "chat_jid": "123456789@s.whatsapp.net",
+            "message_id": "msg-1",
+            "emoji": "👍"
+        }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "message.edit",
+        json!({
+            "chat_jid": "123456789@s.whatsapp.net",
+            "message_id": "msg-1",
+            "text": "edited"
+        }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "message.revoke",
+        json!({
+            "chat_jid": "123456789@s.whatsapp.net",
+            "message_id": "msg-1"
+        }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "message.mark_read",
+        json!({
+            "chat_jid": "123456789@s.whatsapp.net",
+            "message_ids": ["msg-1"],
+            "sender_jid": "123456789@s.whatsapp.net"
+        }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "presence.set",
+        json!({ "status": "available" }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "presence.subscribe",
+        json!({ "jid": "123456789@s.whatsapp.net" }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "presence.unsubscribe",
+        json!({ "jid": "123456789@s.whatsapp.net" }),
+    )
+    .await?;
+    assert_invalid_state(
+        &mut reader,
+        "chatstate.send",
+        json!({
+            "chat_jid": "123456789@s.whatsapp.net",
+            "state": "composing"
+        }),
+    )
+    .await?;
+
     let unsubscribe_id = Uuid::new_v4();
     let response = request_response(
         &mut reader,
@@ -363,5 +430,27 @@ async fn shutdown_daemon(reader: &mut BufReader<UnixStream>) -> Result<()> {
 
     assert_eq!(response["id"], shutdown_id.to_string());
     assert_eq!(response["ok"], true);
+    Ok(())
+}
+
+async fn assert_invalid_state(
+    reader: &mut BufReader<UnixStream>,
+    command: &str,
+    payload: serde_json::Value,
+) -> Result<()> {
+    let request_id = Uuid::new_v4();
+    let response = request_response(
+        reader,
+        json!({
+            "id": request_id,
+            "type": command,
+            "payload": payload,
+        }),
+    )
+    .await?;
+
+    assert_eq!(response["id"], request_id.to_string());
+    assert_eq!(response["ok"], false);
+    assert_eq!(response["error"]["code"], "invalid_state");
     Ok(())
 }

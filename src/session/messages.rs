@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
 use whatsapp_rust::{Jid, waproto::whatsapp as wa};
 
@@ -6,8 +6,7 @@ use crate::{
     store::{ListMessagesQuery, MessageRecordInput},
     types::{
         GetMessagePayload, ListMessagesPayload, ListMessagesResultPayload, OutgoingMessage,
-        SendMessagePayload, SendMessageResultPayload, SendTextPayload, SessionState,
-        StoredMessagePayload,
+        SendMessagePayload, SendMessageResultPayload, SendTextPayload, StoredMessagePayload,
     },
 };
 
@@ -39,7 +38,7 @@ impl SessionManager {
         text: String,
     ) -> Result<SendMessageResultPayload, SessionError> {
         let jid = parse_full_jid(&chat_jid)?;
-        let client = self.client_for_send().await?;
+        let client = self.client_for_connected().await?;
         let result = client
             .send_message(
                 jid,
@@ -117,30 +116,14 @@ impl SessionManager {
             .map_err(SessionError::StoreFailed)
             .map(|message| message.map(StoredMessagePayload::from))
     }
-
-    async fn client_for_send(&self) -> Result<Arc<whatsapp_rust::Client>, SessionError> {
-        let inner = self.inner.lock().await;
-        if inner.state != SessionState::Connected {
-            return Err(SessionError::InvalidState(format!(
-                "session is {:?}",
-                inner.state
-            )));
-        }
-
-        inner
-            .running
-            .as_ref()
-            .map(|running| Arc::clone(&running.client))
-            .ok_or_else(|| SessionError::InvalidState("session is not running".to_owned()))
-    }
 }
 
-fn parse_full_jid(chat_jid: &str) -> Result<Jid, SessionError> {
+pub(super) fn parse_full_jid(chat_jid: &str) -> Result<Jid, SessionError> {
     validate_full_jid(chat_jid)?;
     Jid::from_str(chat_jid).map_err(|_error| invalid_chat_jid())
 }
 
-fn validate_full_jid(chat_jid: &str) -> Result<(), SessionError> {
+pub(super) fn validate_full_jid(chat_jid: &str) -> Result<(), SessionError> {
     let Some((user, _server)) = chat_jid.split_once('@') else {
         return Err(invalid_chat_jid());
     };
@@ -162,7 +145,7 @@ fn is_group_chat(chat_jid: &str) -> bool {
     chat_jid.ends_with("@g.us")
 }
 
-fn now_unix_seconds() -> i64 {
+pub(super) fn now_unix_seconds() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs() as i64)

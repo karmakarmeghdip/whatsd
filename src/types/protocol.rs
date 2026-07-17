@@ -111,6 +111,14 @@ pub enum CommandType {
     ContactList,
     #[serde(rename = "contact.get")]
     ContactGet,
+    #[serde(rename = "presence.set")]
+    PresenceSet,
+    #[serde(rename = "presence.subscribe")]
+    PresenceSubscribe,
+    #[serde(rename = "presence.unsubscribe")]
+    PresenceUnsubscribe,
+    #[serde(rename = "chatstate.send")]
+    ChatStateSend,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]

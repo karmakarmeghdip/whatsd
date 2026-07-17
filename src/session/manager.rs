@@ -158,6 +158,22 @@ impl SessionManager {
         });
     }
 
+    pub(super) async fn client_for_connected(&self) -> Result<Arc<Client>, SessionError> {
+        let inner = self.inner.lock().await;
+        if inner.state != SessionState::Connected {
+            return Err(SessionError::InvalidState(format!(
+                "session is {:?}",
+                inner.state
+            )));
+        }
+
+        inner
+            .running
+            .as_ref()
+            .map(|running| Arc::clone(&running.client))
+            .ok_or_else(|| SessionError::InvalidState("session is not running".to_owned()))
+    }
+
     async fn take_running(&self, next_state: SessionState) -> Result<Arc<Client>, SessionError> {
         let mut inner = self.inner.lock().await;
         let Some(running) = inner.running.take() else {

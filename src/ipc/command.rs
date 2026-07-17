@@ -4,14 +4,15 @@ use serde_json::json;
 
 use crate::{
     session::SessionError,
-    types::{
-        CommandType, ErrorBody, EventType, GetMessagePayload, IpcRequest, IpcResponse,
-        ListMessagesPayload, PairCodePayload, SendMessagePayload, SendTextPayload,
-    },
+    types::{CommandType, ErrorBody, EventType, IpcRequest, IpcResponse, PairCodePayload},
 };
 
-use super::server::{IPC_PROTOCOL_VERSION, IpcState};
-use super::subscription::subscribe_response;
+use super::{
+    message_commands::{handle_message_request, is_message_command},
+    presence_commands::{handle_presence_request, is_presence_command},
+    server::{IPC_PROTOCOL_VERSION, IpcState},
+    subscription::subscribe_response,
+};
 
 pub(super) enum CommandOutcome {
     Response(IpcResponse),
@@ -24,6 +25,14 @@ pub(super) enum CommandOutcome {
 }
 
 pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> CommandOutcome {
+    if is_message_command(request.command) {
+        return handle_message_request(request, state).await;
+    }
+
+    if is_presence_command(request.command) {
+        return handle_presence_request(request, state).await;
+    }
+
     match request.command {
         CommandType::DaemonPing => CommandOutcome::Response(IpcResponse::success(
             request.id,
@@ -89,77 +98,6 @@ pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> Com
             state.session_manager.logout().await,
             "failed to serialize session status",
         ),
-        CommandType::MessageSendText => {
-            let payload = match parse_payload::<SendTextPayload>(
-                request.id,
-                request.payload,
-                "send-text payload",
-            ) {
-                Ok(payload) => payload,
-                Err(response) => return CommandOutcome::Response(response),
-            };
-
-            session_response(
-                request.id,
-                state.session_manager.send_text(payload).await,
-                "failed to serialize send result",
-            )
-        }
-        CommandType::MessageSend => {
-            let payload = match parse_payload::<SendMessagePayload>(
-                request.id,
-                request.payload,
-                "send-message payload",
-            ) {
-                Ok(payload) => payload,
-                Err(response) => return CommandOutcome::Response(response),
-            };
-
-            session_response(
-                request.id,
-                state.session_manager.send_message(payload).await,
-                "failed to serialize send result",
-            )
-        }
-        CommandType::MessageList => {
-            let payload = match parse_payload::<ListMessagesPayload>(
-                request.id,
-                request.payload,
-                "message-list payload",
-            ) {
-                Ok(payload) => payload,
-                Err(response) => return CommandOutcome::Response(response),
-            };
-
-            session_response(
-                request.id,
-                state.session_manager.list_messages(payload).await,
-                "failed to serialize message list",
-            )
-        }
-        CommandType::MessageGet => {
-            let payload = match parse_payload::<GetMessagePayload>(
-                request.id,
-                request.payload,
-                "message-get payload",
-            ) {
-                Ok(payload) => payload,
-                Err(response) => return CommandOutcome::Response(response),
-            };
-
-            match state.session_manager.get_message(payload).await {
-                Ok(Some(message)) => {
-                    session_response(request.id, Ok(message), "failed to serialize message")
-                }
-                Ok(None) => CommandOutcome::Response(IpcResponse::failure(
-                    request.id,
-                    not_found("message not found"),
-                )),
-                Err(error) => {
-                    CommandOutcome::Response(IpcResponse::failure(request.id, session_error(error)))
-                }
-            }
-        }
         CommandType::EventSubscribe => subscribe_response(request),
         CommandType::EventUnsubscribe => CommandOutcome::Unsubscribe(IpcResponse::success(
             request.id,
@@ -175,7 +113,7 @@ pub(super) async fn handle_request(request: IpcRequest, state: &IpcState) -> Com
     }
 }
 
-fn session_response(
+pub(super) fn session_response(
     id: uuid::Uuid,
     result: Result<impl serde::Serialize, SessionError>,
     serialize_context: &'static str,
@@ -192,7 +130,7 @@ fn session_response(
     }
 }
 
-fn parse_payload<T>(
+pub(super) fn parse_payload<T>(
     id: uuid::Uuid,
     payload: serde_json::Value,
     label: &'static str,
@@ -203,6 +141,13 @@ where
     serde_json::from_value::<T>(payload).map_err(|error| {
         IpcResponse::failure(id, invalid_request(format!("invalid {label}: {error}")))
     })
+}
+
+pub(super) fn not_found(message: &str) -> ErrorBody {
+    ErrorBody {
+        code: "not_found".to_owned(),
+        message: message.to_owned(),
+    }
 }
 
 fn unix_timestamp_seconds() -> u64 {
@@ -222,13 +167,6 @@ fn internal_error(message: String) -> ErrorBody {
     ErrorBody {
         code: "internal_error".to_owned(),
         message,
-    }
-}
-
-fn not_found(message: &str) -> ErrorBody {
-    ErrorBody {
-        code: "not_found".to_owned(),
-        message: message.to_owned(),
     }
 }
 
