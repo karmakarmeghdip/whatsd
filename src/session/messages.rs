@@ -1,6 +1,8 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
-use whatsapp_rust::{Jid, waproto::whatsapp as wa};
+use tokio::time::timeout;
+use tracing::{debug, warn};
+use whatsapp_rust::{Jid, NodeFilter, SendOptions, waproto::whatsapp as wa};
 
 use crate::{
     store::{ListMessagesQuery, MessageRecordInput},
@@ -14,6 +16,7 @@ use super::{error::SessionError, manager::SessionManager};
 
 const DEFAULT_LIST_LIMIT: u32 = 50;
 const MAX_LIST_LIMIT: u32 = 500;
+const SEND_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 
 impl SessionManager {
     pub async fn send_text(
@@ -39,16 +42,36 @@ impl SessionManager {
     ) -> Result<SendMessageResultPayload, SessionError> {
         let jid = parse_full_jid(&chat_jid)?;
         let client = self.client_for_connected().await?;
+        let message_id = client.generate_message_id().await;
+        let ack_waiter = client.wait_for_node(NodeFilter::tag("ack").attr("id", &message_id));
+
+        debug!(
+            account_id = %self.account_id,
+            target_kind = jid_kind(&chat_jid),
+            message_id = %message_id,
+            text_bytes = text.len(),
+            "submitting outgoing text message"
+        );
+
         let result = client
-            .send_message(
+            .send_message_with_options(
                 jid,
-                wa::Message {
-                    conversation: Some(text.clone()),
+                text_message(&text),
+                SendOptions {
+                    message_id: Some(message_id.clone()),
                     ..Default::default()
                 },
             )
             .await
             .map_err(SessionError::SendFailed)?;
+        wait_for_send_ack(
+            ack_waiter,
+            &message_id,
+            &self.account_id,
+            jid_kind(&chat_jid),
+        )
+        .await?;
+
         let chat_jid = result.to.to_string();
 
         self.store
@@ -71,7 +94,7 @@ impl SessionManager {
         Ok(SendMessageResultPayload {
             message_id: result.message_id,
             chat_jid,
-            status: "sent".to_owned(),
+            status: "server_ack".to_owned(),
         })
     }
 
@@ -118,6 +141,81 @@ impl SessionManager {
     }
 }
 
+async fn wait_for_send_ack<E>(
+    ack_waiter: impl std::future::Future<
+        Output = Result<std::sync::Arc<whatsapp_rust::OwnedNodeRef>, E>,
+    >,
+    message_id: &str,
+    account_id: &str,
+    target_kind: &str,
+) -> Result<(), SessionError>
+where
+    E: std::fmt::Debug,
+{
+    match timeout(SEND_ACK_TIMEOUT, ack_waiter).await {
+        Ok(Ok(node)) => {
+            let ack = node.get();
+            if let Some(error) = ack
+                .get_attr("error")
+                .map(|value| value.as_str().into_owned())
+            {
+                warn!(
+                    account_id = %account_id,
+                    target_kind,
+                    message_id,
+                    error_code = %error,
+                    "WhatsApp rejected outgoing message"
+                );
+                return Err(SessionError::SendFailed(anyhow::anyhow!(
+                    "WhatsApp server rejected message with ack error {error}"
+                )));
+            }
+
+            debug!(
+                account_id = %account_id,
+                target_kind,
+                message_id,
+                has_phash = ack.get_attr("phash").is_some(),
+                "WhatsApp acknowledged outgoing message"
+            );
+            Ok(())
+        }
+        Ok(Err(_closed)) => {
+            warn!(
+                account_id = %account_id,
+                target_kind,
+                message_id,
+                "outgoing message ack waiter closed before receiving server ack"
+            );
+            Err(SessionError::SendFailed(anyhow::anyhow!(
+                "ack waiter closed before WhatsApp server acknowledged message"
+            )))
+        }
+        Err(_elapsed) => {
+            warn!(
+                account_id = %account_id,
+                target_kind,
+                message_id,
+                timeout_seconds = SEND_ACK_TIMEOUT.as_secs(),
+                "timed out waiting for outgoing message server ack"
+            );
+            Err(SessionError::SendFailed(anyhow::anyhow!(
+                "timed out waiting for WhatsApp server ack"
+            )))
+        }
+    }
+}
+
+fn text_message(text: &str) -> wa::Message {
+    wa::Message {
+        extended_text_message: Some(Box::new(wa::message::ExtendedTextMessage {
+            text: Some(text.to_owned()),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
 pub(super) fn parse_full_jid(chat_jid: &str) -> Result<Jid, SessionError> {
     parse_full_jid_field(chat_jid, "chat_jid")
 }
@@ -151,6 +249,18 @@ fn invalid_jid(field_name: &str) -> SessionError {
 
 fn is_group_chat(chat_jid: &str) -> bool {
     chat_jid.ends_with("@g.us")
+}
+
+fn jid_kind(jid: &str) -> &'static str {
+    if jid.ends_with("@g.us") {
+        "group"
+    } else if jid.ends_with("@lid") {
+        "lid"
+    } else if jid.ends_with("@s.whatsapp.net") {
+        "pn"
+    } else {
+        "other"
+    }
 }
 
 pub(super) fn now_unix_seconds() -> i64 {
