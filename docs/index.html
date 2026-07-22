@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>whatsd — Codebase Architecture & File Reference</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #0b0f17;
+      --bg-card: rgba(18, 24, 38, 0.75);
+      --bg-card-hover: rgba(28, 36, 56, 0.85);
+      --bg-elevated: #161f30;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-highlight: rgba(16, 185, 129, 0.3);
+      
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --accent-emerald: #10b981;
+      --accent-cyan: #06b6d4;
+      --accent-violet: #8b5cf6;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-blue: #3b82f6;
+
+      --gradient-primary: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+      --gradient-accent: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+      --gradient-glow: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.15), transparent 70%);
+
+      --font-heading: 'Outfit', -apple-system, sans-serif;
+      --font-body: 'Inter', -apple-system, sans-serif;
+      --font-code: 'JetBrains Mono', monospace;
+
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+
+      --shadow-glow: 0 0 25px rgba(16, 185, 129, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: var(--gradient-glow);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: var(--font-body);
+      line-height: 1.6;
+      overflow-x: hidden;
+      padding-bottom: 80px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header / Hero */
+    header {
+      padding: 60px 0 40px;
+      text-align: center;
+      position: relative;
+    }
+
+    .badge-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      backdrop-filter: blur(8px);
+    }
+
+    .badge-emerald {
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    .badge-violet {
+      border-color: rgba(139, 92, 246, 0.4);
+      color: var(--accent-violet);
+      background: rgba(139, 92, 246, 0.08);
+    }
+
+    .hero-title {
+      font-family: var(--font-heading);
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-title span {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      max-width: 780px;
+      margin: 0 auto 36px;
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 50px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      border-radius: var(--radius-md);
+      text-align: center;
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-highlight);
+    }
+
+    .stat-number {
+      font-family: var(--font-heading);
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 40px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-body);
+      font-size: 0.98rem;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      color: #0b0f17;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Section Headers */
+    .section-header {
+      margin-bottom: 28px;
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 800px;
+    }
+
+    /* Architecture Visualizer Card */
+    .arch-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      backdrop-filter: blur(12px);
+      margin-bottom: 50px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .svg-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    svg.arch-svg {
+      width: 100%;
+      min-width: 900px;
+      height: auto;
+    }
+
+    /* SVG Interactive Elements */
+    .node-group {
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .node-bg {
+      fill: #162032;
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 1.5;
+      rx: 12;
+      transition: all 0.3s ease;
+    }
+
+    .node-group:hover .node-bg {
+      fill: #1e2c45;
+      stroke: var(--accent-emerald);
+      filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.4));
+    }
+
+    .node-title {
+      fill: #f8fafc;
+      font-family: var(--font-heading);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .node-subtitle {
+      fill: #94a3b8;
+      font-family: var(--font-body);
+      font-size: 11px;
+    }
+
+    .conn-line {
+      stroke: rgba(148, 163, 184, 0.3);
+      stroke-width: 2;
+      stroke-dasharray: 6 6;
+      animation: dash 30s linear infinite;
+    }
+
+    .conn-line-active {
+      stroke: var(--accent-emerald);
+      stroke-width: 2.5;
+      stroke-dasharray: 8 4;
+      animation: dash 15s linear infinite;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -100;
+      }
+    }
+
+    /* File Explorer Section */
+    .explorer-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px 12px 42px;
+      color: var(--text-main);
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-emerald);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      width: 18px;
+      height: 18px;
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-pill {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-pill:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: var(--text-main);
+    }
+
+    .filter-pill.active {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: var(--accent-emerald);
+      color: var(--accent-emerald);
+    }
+
+    /* File Cards Grid */
+    .files-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 20px;
+    }
+
+    .file-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      backdrop-filter: blur(8px);
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .file-card:hover {
+      border-color: var(--border-highlight);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .file-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .file-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .file-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.8rem;
+      font-family: var(--font-code);
+      flex-shrink: 0;
+    }
+
+    .icon-rs { background: rgba(247, 76, 0, 0.15); color: #f74c00; border: 1px solid rgba(247, 76, 0, 0.3); }
+    .icon-toml { background: rgba(224, 93, 56, 0.15); color: #e05d38; border: 1px solid rgba(224, 93, 56, 0.3); }
+    .icon-md { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+
+    .file-name {
+      font-family: var(--font-code);
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    .file-layer-badge {
+      font-size: 0.72rem;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .layer-core { background: rgba(16, 185, 129, 0.1); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .layer-ipc { background: rgba(6, 182, 212, 0.1); color: var(--accent-cyan); border: 1px solid rgba(6, 182, 212, 0.2); }
+    .layer-session { background: rgba(139, 92, 246, 0.1); color: var(--accent-violet); border: 1px solid rgba(139, 92, 246, 0.2); }
+    .layer-store { background: rgba(245, 158, 11, 0.1); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .layer-types { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); border: 1px solid rgba(59, 130, 246, 0.2); }
+    .layer-meta { background: rgba(244, 63, 94, 0.1); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+
+    .file-desc {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .file-meta-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.82rem;
+      color: var(--text-dim);
+    }
+
+    .file-detail-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .file-detail-btn:hover {
+      background: var(--accent-emerald);
+      border-color: var(--accent-emerald);
+      color: #0b0f17;
+    }
+
+    /* Modal / Drawer for File Details */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(5, 8, 14, 0.8);
+      backdrop-filter: blur(10px);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: #111827;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      width: 90%;
+      max-width: 800px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 36px;
+      position: relative;
+      transform: translateY(20px);
+      transition: transform 0.3s ease;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .modal-overlay.active .modal-card {
+      transform: translateY(0);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .modal-title {
+      font-family: var(--font-code);
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+      color: var(--accent-emerald);
+    }
+
+    .modal-path {
+      color: var(--text-dim);
+      font-family: var(--font-code);
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    .modal-section-title {
+      font-family: var(--font-heading);
+      font-size: 1.1rem;
+      color: var(--text-main);
+      margin: 20px 0 10px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 6px;
+    }
+
+    .modal-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .modal-list li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .modal-list li::before {
+      content: "•";
+      color: var(--accent-emerald);
+      font-weight: bold;
+      font-size: 1.2rem;
+      position: absolute;
+      left: 0;
+      top: -2px;
+    }
+
+    .code-block {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      font-family: var(--font-code);
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+      margin-top: 12px;
+      white-space: pre;
+    }
+
+    /* Protocol & Event Inspector */
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      backdrop-filter: blur(12px);
+    }
+
+    @media (max-width: 860px) {
+      .inspector-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .inspector-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .inspector-item {
+      padding: 12px 16px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .inspector-item:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .inspector-item.active {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: var(--accent-emerald);
+    }
+
+    .inspector-item-name {
+      font-family: var(--font-code);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .inspector-item-tag {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dim);
+    }
+
+    .inspector-preview {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .preview-title {
+      font-family: var(--font-code);
+      font-size: 1.1rem;
+      color: var(--accent-cyan);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 80px;
+      text-align: center;
+      padding-top: 30px;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    /* Utility */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="badge-container">
+        <span class="badge badge-emerald">Rust Edition 2024</span>
+        <span class="badge badge-violet">Tokio Async Runtime</span>
+        <span class="badge">Unix Socket IPC</span>
+        <span class="badge">SQLite Persistence</span>
+      </div>
+      <h1 class="hero-title"><code>whatsd</code> <span>Codebase Architecture</span></h1>
+      <p class="hero-subtitle">
+        A high-performance, Linux-first WhatsApp Web background daemon written in Rust. Keeps WhatsApp Web sessions active and exposes structured local client operations over a Unix domain socket.
+      </p>
+    </header>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">36</div>
+        <div class="stat-label">Source & Doc Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">5</div>
+        <div class="stat-label">Architectural Layers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">34</div>
+        <div class="stat-label">IPC Commands</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">12</div>
+        <div class="stat-label">Normalized Event Types</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('architecture')">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+        System Architecture
+      </button>
+      <button class="tab-btn" onclick="switchTab('files')">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+        File Directory & Modules
+      </button>
+      <button class="tab-btn" onclick="switchTab('protocol')">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+        IPC Protocol & Events
+      </button>
+    </div>
+
+    <!-- Tab 1: System Architecture -->
+    <div id="tab-architecture">
+      <div class="section-header">
+        <h2 class="section-title">
+          <svg width="24" height="24" fill="none" stroke="var(--accent-emerald)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+          System Topology & Flow Infographic
+        </h2>
+        <p class="section-desc">
+          Click any component node in the diagram below to inspect its role, internal file modules, and responsibility in the daemon lifecycle.
+        </p>
+      </div>
+
+      <div class="arch-card">
+        <div class="svg-container">
+          <svg class="arch-svg" viewBox="0 0 1000 480">
+            <!-- Background Grids & Labels -->
+            <rect x="20" y="20" width="200" height="440" fill="rgba(255,255,255,0.015)" rx="16" stroke="rgba(255,255,255,0.05)"/>
+            <text x="120" y="50" fill="#64748b" font-family="Outfit" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">LOCAL CLIENT LAYER</text>
+
+            <rect x="250" y="20" width="480" height="440" fill="rgba(16,185,129,0.02)" rx="16" stroke="rgba(16,185,129,0.1)"/>
+            <text x="490" y="50" fill="#10b981" font-family="Outfit" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">WHATSD DAEMON PROCESS (TOKIO RUNTIME)</text>
+
+            <rect x="760" y="20" width="220" height="440" fill="rgba(255,255,255,0.015)" rx="16" stroke="rgba(255,255,255,0.05)"/>
+            <text x="870" y="50" fill="#64748b" font-family="Outfit" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">EXTERNAL & UPSTREAM</text>
+
+            <!-- Connections -->
+            <!-- Client -> Socket -->
+            <path class="conn-line-active" d="M 180 140 L 280 140" />
+            <path class="conn-line-active" d="M 180 240 L 280 140" />
+            <path class="conn-line-active" d="M 180 340 L 280 140" />
+
+            <!-- Socket -> Server -->
+            <path class="conn-line-active" d="M 440 140 L 490 140" />
+
+            <!-- Server -> Session Manager & Event Router -->
+            <path class="conn-line" d="M 590 140 L 590 230" />
+            <path class="conn-line" d="M 590 290 L 590 350" />
+
+            <!-- Session Manager -> Local SQLite Store & Upstream Bot -->
+            <path class="conn-line-active" d="M 640 260 L 800 260" />
+            <path class="conn-line" d="M 540 290 L 440 370" />
+
+            <!-- Upstream Bot -> WhatsApp Web Servers -->
+            <path class="conn-line-active" d="M 900 260 L 900 370" stroke-dasharray="4 4" />
+
+            <!-- Nodes -->
+            <!-- Client 1: Emacs / GTK / CLI -->
+            <g class="node-group" onclick="showNodeDetails('clients')">
+              <rect class="node-bg" x="40" y="100" width="140" height="70" />
+              <text class="node-title" x="110" y="132" text-anchor="middle">Emacs / GTK Apps</text>
+              <text class="node-subtitle" x="110" y="150" text-anchor="middle">JSON Line IPC Client</text>
+            </g>
+
+            <g class="node-group" onclick="showNodeDetails('clients')">
+              <rect class="node-bg" x="40" y="205" width="140" height="70" />
+              <text class="node-title" x="110" y="237" text-anchor="middle">whatsctl CLI</text>
+              <text class="node-subtitle" x="110" y="255" text-anchor="middle">Command Line Tool</text>
+            </g>
+
+            <g class="node-group" onclick="showNodeDetails('clients')">
+              <rect class="node-bg" x="40" y="310" width="140" height="70" />
+              <text class="node-title" x="110" y="342" text-anchor="middle">Custom Scripts</text>
+              <text class="node-subtitle" x="110" y="360" text-anchor="middle">Unix Socket Consumer</text>
+            </g>
+
+            <!-- Unix Socket Endpoint -->
+            <g class="node-group" onclick="showNodeDetails('socket')">
+              <rect class="node-bg" x="280" y="105" width="160" height="70" style="fill: #0c2d25; stroke: #10b981;" />
+              <text class="node-title" x="360" y="137" text-anchor="middle" style="fill: #10b981;">Unix Socket (0700)</text>
+              <text class="node-subtitle" x="360" y="155" text-anchor="middle">whatsd.sock (XDG Runtime)</text>
+            </g>
+
+            <!-- IPC Server & Command Router -->
+            <g class="node-group" onclick="showNodeDetails('ipc_server')">
+              <rect class="node-bg" x="490" y="105" width="200" height="70" />
+              <text class="node-title" x="590" y="137" text-anchor="middle">IPC Server Layer</text>
+              <text class="node-subtitle" x="590" y="155" text-anchor="middle">ipc/ (server, codec, router)</text>
+            </g>
+
+            <!-- Session Manager -->
+            <g class="node-group" onclick="showNodeDetails('session_mgr')">
+              <rect class="node-bg" x="490" y="230" width="200" height="70" style="fill: #221538; stroke: #8b5cf6;" />
+              <text class="node-title" x="590" y="262" text-anchor="middle" style="fill: #c084fc;">Session Manager</text>
+              <text class="node-subtitle" x="590" y="280" text-anchor="middle">session/ (bot, events, actions)</text>
+            </g>
+
+            <!-- Local Persistence Store -->
+            <g class="node-group" onclick="showNodeDetails('store')">
+              <rect class="node-bg" x="290" y="350" width="180" height="70" style="fill: #2e1d05; stroke: #f59e0b;" />
+              <text class="node-title" x="380" y="382" text-anchor="middle" style="fill: #fbbf24;">Local Daemon Store</text>
+              <text class="node-subtitle" x="380" y="400" text-anchor="middle">store/ (Diesel SQLite whatsd.db)</text>
+            </g>
+
+            <!-- Upstream Bot & Signal Protocol -->
+            <g class="node-group" onclick="showNodeDetails('whatsapp_bot')">
+              <rect class="node-bg" x="780" y="230" width="180" height="70" />
+              <text class="node-title" x="870" y="262" text-anchor="middle">whatsapp-rust Bot</text>
+              <text class="node-subtitle" x="870" y="280" text-anchor="middle">SqliteStore (whatsapp.db)</text>
+            </g>
+
+            <!-- WhatsApp Web CDN & WebSockets -->
+            <g class="node-group" onclick="showNodeDetails('whatsapp_web')">
+              <rect class="node-bg" x="780" y="350" width="180" height="70" />
+              <text class="node-title" x="870" y="382" text-anchor="middle">WhatsApp Web Servers</text>
+              <text class="node-subtitle" x="870" y="400" text-anchor="middle">Noise Protocol & Media CDN</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: File Directory & Modules -->
+    <div id="tab-files" class="hidden">
+      <div class="section-header">
+        <h2 class="section-title">
+          <svg width="24" height="24" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          Codebase Directory & Module Reference
+        </h2>
+        <p class="section-desc">
+          Search and filter all 36 source files in `whatsd`. Click on any file to view its exact responsibilities, exported types, safety mechanisms, and architectural role.
+        </p>
+      </div>
+
+      <div class="explorer-toolbar">
+        <div class="search-box">
+          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input type="text" class="search-input" id="file-search" placeholder="Search file name or description (e.g. socket, codec, message, store)..." oninput="filterFiles()">
+        </div>
+        <div class="filter-pills">
+          <button class="filter-pill active" onclick="setFilter('all', this)">All (36)</button>
+          <button class="filter-pill" onclick="setFilter('core', this)">Core & Lifecycle</button>
+          <button class="filter-pill" onclick="setFilter('ipc', this)">IPC Layer</button>
+          <button class="filter-pill" onclick="setFilter('session', this)">Session Layer</button>
+          <button class="filter-pill" onclick="setFilter('store', this)">Persistence Store</button>
+          <button class="filter-pill" onclick="setFilter('types', this)">Data Types</button>
+          <button class="filter-pill" onclick="setFilter('meta', this)">Tests & Meta</button>
+        </div>
+      </div>
+
+      <div class="files-grid" id="files-grid">
+        <!-- Cards generated dynamically via JavaScript -->
+      </div>
+    </div>
+
+    <!-- Tab 3: IPC Protocol & Events -->
+    <div id="tab-protocol" class="hidden">
+      <div class="section-header">
+        <h2 class="section-title">
+          <svg width="24" height="24" fill="none" stroke="var(--accent-violet)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          IPC Protocol & Event Stream Reference
+        </h2>
+        <p class="section-desc">
+          `whatsd` uses a clean, line-delimited JSON wire protocol over a Unix domain socket. Select a command or event below to inspect the wire format.
+        </p>
+      </div>
+
+      <div class="inspector-grid">
+        <div class="inspector-list" id="protocol-list">
+          <!-- Populated by JS -->
+        </div>
+        <div class="inspector-preview">
+          <div class="preview-header">
+            <div class="preview-title" id="preview-title">daemon.ping</div>
+            <span class="badge badge-emerald" id="preview-type">COMMAND</span>
+          </div>
+          <p id="preview-desc" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 16px;"></p>
+
+          <div class="modal-section-title">Request Frame (JSON line)</div>
+          <div class="code-block" id="preview-req"></div>
+
+          <div class="modal-section-title">Response Frame (JSON line)</div>
+          <div class="code-block" id="preview-res"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p><code>whatsd</code> — Linux-first WhatsApp Web Daemon architecture documentation.</p>
+    </footer>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="file-modal" onclick="closeModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModalDirect()">&times;</button>
+      <div class="modal-title" id="modal-filename">file.rs</div>
+      <div class="modal-path" id="modal-filepath">src/file.rs</div>
+      
+      <p id="modal-summary" style="color: var(--text-muted); font-size: 1rem; margin-bottom: 16px;"></p>
+
+      <div class="modal-section-title">Key Responsibilities & Functionality</div>
+      <ul class="modal-list" id="modal-responsibilities"></ul>
+
+      <div class="modal-section-title">Exported Structs, Enums & Functions</div>
+      <div class="code-block" id="modal-exports"></div>
+    </div>
+  </div>
+
+  <script>
+    // File Database (36 files)
+    const filesData = [
+      // Core & Lifecycle
+      {
+        name: "main.rs",
+        path: "src/main.rs",
+        layer: "core",
+        icon: "rs",
+        summary: "CLI binary entrypoint for the `whatsd` daemon process.",
+        details: [
+          "Parses command line arguments and environment variables using `clap`.",
+          "Configures `tracing-subscriber` log filtering (`WHATSD_LOG`).",
+          "Resolves default XDG runtime, state, and cache directory paths.",
+          "Launches the asynchronous Tokio runtime via `daemon::run(config)`."
+        ],
+        exports: "fn main() -> Result<()>\nfn init_tracing(log_filter: &str) -> Result<()>"
+      },
+      {
+        name: "config.rs",
+        path: "src/config.rs",
+        layer: "core",
+        icon: "rs",
+        summary: "Configuration management, command-line parsing, and XDG path resolution.",
+        details: [
+          "Defines `Cli` struct with clap attributes for environment overrides.",
+          "Resolves socket paths: `$XDG_RUNTIME_DIR/whatsd/whatsd.sock`.",
+          "Resolves state & database paths under `$XDG_STATE_HOME/whatsd/accounts/<account_id>/`.",
+          "Performs strict path validation on `account_id` to prevent path traversal vulnerabilities (`..` or non-alphanumeric characters)."
+        ],
+        exports: "pub struct Cli { ... }\npub struct Config { ... }\nimpl Config { pub fn from_cli(cli: Cli) -> Result<Self> }"
+      },
+      {
+        name: "daemon.rs",
+        path: "src/daemon.rs",
+        layer: "core",
+        icon: "rs",
+        summary: "Daemon lifecycle orchestrator, signal handling, and task management.",
+        details: [
+          "Ensures private state and cache directory permissions before startup.",
+          "Opens local SQLite store connection (`whatsd.db`).",
+          "Initializes `SessionManager` and `IpcServer` instances.",
+          "Installs Unix signal listeners for graceful shutdown on `SIGTERM` and `SIGINT` (Ctrl-C).",
+          "Coordinates Toko task cancellation and clean resource release."
+        ],
+        exports: "pub async fn run(config: Config) -> Result<()>\nasync fn shutdown_signal() -> Result<&'static str>"
+      },
+      {
+        name: "unix.rs",
+        path: "src/unix.rs",
+        layer: "core",
+        icon: "rs",
+        summary: "Security-critical Unix filesystem and process permission utilities.",
+        details: [
+          "Enforces strict `0700` user-only permissions on state and socket directories.",
+          "Checks Effective User ID (EUID) via `libc::geteuid()` to ensure files are owned by the active user.",
+          "Prevents symlink hijacking and insecure multi-user socket access."
+        ],
+        exports: "pub(crate) async fn ensure_private_dir(path: &Path, label: &str) -> Result<()>\npub(crate) fn ensure_owned_by_current_user(...)\npub(crate) fn current_euid() -> u32"
+      },
+      {
+        name: "lib.rs",
+        path: "src/lib.rs",
+        layer: "core",
+        icon: "rs",
+        summary: "Root of the library crate exporting all daemon module hierarchies.",
+        details: [
+          "Exports public submodules: `config`, `daemon`, `ipc`, `session`, `store`, `types`.",
+          "Internal crate module: `unix`."
+        ],
+        exports: "pub mod config;\npub mod daemon;\npub mod ipc;\npub mod session;\npub mod store;\npub mod types;\npub(crate) mod unix;"
+      },
+
+      // IPC Layer
+      {
+        name: "server.rs",
+        path: "src/ipc/server.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Unix domain socket listener and client connection dispatcher.",
+        details: [
+          "Binds secure Unix domain socket using `socket::bind_secure_listener`.",
+          "Runs async accept loop to handle incoming local client connections.",
+          "Spawns independent Tokio tasks per connected client.",
+          "Maintains uptime metrics (`started_at`) and handles global IPC shutdown requests."
+        ],
+        exports: "pub struct IpcServer { ... }\nimpl IpcServer { pub fn new(...), pub async fn run(...) }"
+      },
+      {
+        name: "socket.rs",
+        path: "src/ipc/socket.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Secure Unix socket creation, stale socket cleanup, and permission hardening.",
+        details: [
+          "Verifies parent directory permissions (`0700`) prior to binding.",
+          "Tests stale socket files by attempting connection before unlinking.",
+          "Applies `0600` permissions directly to the socket file."
+        ],
+        exports: "pub async fn bind_secure_listener(socket_path: &Path) -> Result<UnixListener>"
+      },
+      {
+        name: "connection.rs",
+        path: "src/ipc/connection.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Per-client connection lifecycle, request loop, and event streaming task.",
+        details: [
+          "Splits `UnixStream` into reader and writer halves.",
+          "Decodes line-delimited JSON `IpcRequest` frames.",
+          "Routes commands to `command::handle_request`.",
+          "Manages active client event subscriptions (`SubscriptionMap`).",
+          "Encodes and writes JSON `IpcResponse` frames."
+        ],
+        exports: "pub async fn handle_client(stream: UnixStream, session_manager: SessionManager, ...)"
+      },
+      {
+        name: "codec.rs",
+        path: "src/ipc/codec.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Stream framing codec for newline-delimited JSON frames.",
+        details: [
+          "Reads line-by-line using Tokio `BufReader`.",
+          "Deserializes UTF-8 bytes into structured JSON types.",
+          "Serializes outgoing responses and appends trailing `\n`."
+        ],
+        exports: "pub async fn read_request(reader: &mut R) -> Result<Option<IpcRequest>>\npub async fn write_response(writer: &mut W, response: &IpcResponse) -> Result<()>"
+      },
+      {
+        name: "command.rs",
+        path: "src/ipc/command.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Master IPC command router and daemon/session management handlers.",
+        details: [
+          "Routes `CommandType` to specialized handler modules.",
+          "Handles `daemon.ping`, `daemon.version`, `daemon.status`, `daemon.shutdown`.",
+          "Handles `session.status`, `session.connect`, `session.disconnect`, `session.logout`, `session.pair_qr`, `session.pair_code`.",
+          "Handles `event.subscribe` and `event.unsubscribe`."
+        ],
+        exports: "pub async fn handle_request(req: IpcRequest, session: &SessionManager, ...) -> IpcResponse"
+      },
+      {
+        name: "message_commands.rs",
+        path: "src/ipc/message_commands.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Handlers for message querying, sending, reactions, edits, and revokes.",
+        details: [
+          "Parses payloads for `message.send_text`, `message.send`, `message.react`, `message.edit`, `message.revoke`, `message.mark_read`.",
+          "Handles local database queries for `message.list` and `message.get`."
+        ],
+        exports: "pub async fn handle_send_text(...)\npub async fn handle_list_messages(...)"
+      },
+      {
+        name: "contact_commands.rs",
+        path: "src/ipc/contact_commands.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Handlers for contact search, retrieval, and profile pictures.",
+        details: [
+          "Handles `contact.list`, `contact.get`, `contact.profile_picture`.",
+          "Fetches profile photo URLs or cached binaries."
+        ],
+        exports: "pub async fn handle_get_contact(...)\npub async fn handle_get_profile_picture(...)"
+      },
+      {
+        name: "media_commands.rs",
+        path: "src/ipc/media_commands.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Handler for media download requests with sandbox path security.",
+        details: [
+          "Validates target relative paths to ensure downloads stay within `$XDG_CACHE_HOME/whatsd/`.",
+          "Rejects absolute paths and `..` path traversal attempts.",
+          "Triggers media fetching and decryption via `SessionManager`."
+        ],
+        exports: "pub async fn handle_download_media(...)"
+      },
+      {
+        name: "presence_commands.rs",
+        path: "src/ipc/presence_commands.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Handlers for setting presence and sending typing/recording status.",
+        details: [
+          "Handles `presence.set` (available, unavailable).",
+          "Handles `presence.subscribe` and `presence.unsubscribe` for chat jids.",
+          "Handles `chatstate.send` (composing, paused, recording)."
+        ],
+        exports: "pub async fn handle_set_presence(...)\npub async fn handle_send_chat_state(...)"
+      },
+      {
+        name: "subscription.rs",
+        path: "src/ipc/subscription.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Client event subscription registry and filtering engine.",
+        details: [
+          "Tracks connected client subscriptions by UUID.",
+          "Filters events based on client-requested `EventFilter` criteria.",
+          "Handles backpressure and drops slow client queues cleanly."
+        ],
+        exports: "pub struct SubscriptionMap { ... }\npub struct ClientSubscription { ... }"
+      },
+      {
+        name: "event_filter.rs",
+        path: "src/ipc/event_filter.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "Event predicate filter matcher.",
+        details: [
+          "Matches incoming `DaemonEvent` instances against active client filters."
+        ],
+        exports: "pub struct EventFilter { ... }\nimpl EventFilter { pub fn matches(&self, event: &DaemonEvent) -> bool }"
+      },
+      {
+        name: "mod.rs",
+        path: "src/ipc/mod.rs",
+        layer: "ipc",
+        icon: "rs",
+        summary: "IPC module root re-exporting server and protocol components.",
+        details: ["Re-exports `IpcServer`, `bind_secure_listener`, `handle_client`."],
+        exports: "pub use server::IpcServer;"
+      },
+
+      // Session Layer
+      {
+        name: "manager.rs",
+        path: "src/session/manager.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "SessionManager core handle bridging IPC calls to `whatsapp-rust`.",
+        details: [
+          "Holds active WhatsApp session state (`SessionState`).",
+          "Manages background bot task handle and shutdown channels.",
+          "Dispatches operations to session submodules."
+        ],
+        exports: "pub struct SessionManager { ... }\nimpl SessionManager { pub fn new(...), pub async fn shutdown(...) }"
+      },
+      {
+        name: "bot.rs",
+        path: "src/session/bot.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "`whatsapp-rust` Bot builder initialization and event callbacks.",
+        details: [
+          "Configures `SqliteStore` backend for `whatsapp.db`.",
+          "Registers callbacks for `on_qr_code`, `on_pair_code`, `on_connected`, `on_logged_out`, `on_message`.",
+          "Spawns the WhatsApp WebSocket event loop task."
+        ],
+        exports: "pub(crate) async fn start_bot(...)"
+      },
+      {
+        name: "events.rs",
+        path: "src/session/events.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Normalizes raw `whatsapp-rust` events into stable `DaemonEvent` IPC structures.",
+        details: [
+          "Converts raw inbound message context into `event.message` payloads.",
+          "Maps receipts to `event.receipt` payloads.",
+          "Maps pairing state changes to `event.pairing_qr` and `event.pairing_code`.",
+          "Broadcasts normalized events across internal channels."
+        ],
+        exports: "pub(crate) fn normalize_and_broadcast(...)"
+      },
+      {
+        name: "actions.rs",
+        path: "src/session/actions.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "High-level session lifecycle actions.",
+        details: [
+          "Implements `connect`, `disconnect`, `logout`, `pair_qr`, `pair_code` logic."
+        ],
+        exports: "pub async fn connect(&self) -> Result<()>\npub async fn logout(&self) -> Result<()>"
+      },
+      {
+        name: "messages.rs",
+        path: "src/session/messages.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "High-level message sending, reactions, edits, revokes, and read receipts.",
+        details: [
+          "Calls `client.send_text()`, `client.send_message()`, `client.send_reaction()`.",
+          "Persists sent messages into local SQLite store."
+        ],
+        exports: "pub async fn send_text(...)\npub async fn send_reaction(...)"
+      },
+      {
+        name: "contacts.rs",
+        path: "src/session/contacts.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Contact details and profile picture fetcher.",
+        details: [
+          "Retrieves contact profile info and downloads profile pictures."
+        ],
+        exports: "pub async fn get_contact(...)\npub async fn get_profile_picture(...)"
+      },
+      {
+        name: "media.rs",
+        path: "src/session/media.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Media attachment downloader, decrypter, and cache manager.",
+        details: [
+          "Fetches media attachments from WhatsApp CDN.",
+          "Decrypts media payload using Signal media keys.",
+          "Saves decrypted file in cache directory."
+        ],
+        exports: "pub async fn download_media(...)"
+      },
+      {
+        name: "presence.rs",
+        path: "src/session/presence.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Presence status and typing state sender.",
+        details: [
+          "Sends presence updates (online, offline) and chat state (composing, recording)."
+        ],
+        exports: "pub async fn set_presence(...)\npub async fn send_chat_state(...)"
+      },
+      {
+        name: "pair_code.rs",
+        path: "src/session/pair_code.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Helper for WhatsApp 8-digit phone pairing code login flow.",
+        details: [
+          "Manages pair code login request and timeout callbacks."
+        ],
+        exports: "pub async fn request_pair_code(...)"
+      },
+      {
+        name: "normalize_message.rs",
+        path: "src/session/normalize_message.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Protobuf message extractor & normalizer.",
+        details: [
+          "Parses raw `waproto::Message` structs into clean JSON-serializable `StoredMessagePayload`."
+        ],
+        exports: "pub fn normalize_message(...)"
+      },
+      {
+        name: "error.rs",
+        path: "src/session/error.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Typed error enum `SessionError` for session layer operations.",
+        details: ["Uses `thiserror` for typed errors like `NotConnected`, `AlreadyConnected`, `AuthenticationFailed`."],
+        exports: "pub enum SessionError { ... }"
+      },
+      {
+        name: "mod.rs",
+        path: "src/session/mod.rs",
+        layer: "session",
+        icon: "rs",
+        summary: "Session module root re-exporting manager and public session types.",
+        details: ["Re-exports `SessionManager`."],
+        exports: "pub use manager::SessionManager;"
+      },
+
+      // Store Layer
+      {
+        name: "sqlite.rs",
+        path: "src/store/sqlite.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Local SQLite persistence store manager (`whatsd.db`).",
+        details: [
+          "Opens SQLite database connection pool using Diesel.",
+          "Runs embedded migrations for message index, cursors, and account state."
+        ],
+        exports: "pub struct Store { ... }\nimpl Store { pub async fn open(path: PathBuf) -> Result<Self> }"
+      },
+      {
+        name: "schema.rs",
+        path: "src/store/schema.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Diesel ORM schema macro definitions.",
+        details: [
+          "Defines `messages`, `event_cursors`, and `account_state` tables."
+        ],
+        exports: "diesel::table! { messages { ... } }"
+      },
+      {
+        name: "models.rs",
+        path: "src/store/models.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Diesel database models and Rust row mappings.",
+        details: [
+          "Defines `MessageRow`, `NewMessageRow`, `EventCursorRow` structs."
+        ],
+        exports: "pub struct MessageRow { ... }\npub struct NewMessageRow { ... }"
+      },
+      {
+        name: "read.rs",
+        path: "src/store/read.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Database read queries for listing and fetching messages.",
+        details: [
+          "Implements `list_messages` with chat JID filter and pagination.",
+          "Implements `get_message_by_id`."
+        ],
+        exports: "pub async fn list_messages(...)\npub async fn get_message(...)"
+      },
+      {
+        name: "write.rs",
+        path: "src/store/write.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Database write queries for inserting messages and updating cursors.",
+        details: [
+          "Provides idempotent `insert_message` using `(chat_jid, sender_jid, message_id)` key.",
+          "Provides `upsert_cursor` for durability progress tracking."
+        ],
+        exports: "pub async fn insert_message(...)\npub async fn upsert_cursor(...)"
+      },
+      {
+        name: "connection.rs",
+        path: "src/store/connection.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "SQLite connection helper and PRAGMA configuration.",
+        details: [
+          "Configures SQLite WAL mode and busy timeouts."
+        ],
+        exports: "pub(crate) fn establish_connection(...)"
+      },
+      {
+        name: "row.rs",
+        path: "src/store/row.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Row conversion functions between database models and application DTOs.",
+        details: [
+          "Converts `MessageRow` into `StoredMessagePayload`."
+        ],
+        exports: "impl From<MessageRow> for StoredMessagePayload"
+      },
+      {
+        name: "mod.rs",
+        path: "src/store/mod.rs",
+        layer: "store",
+        icon: "rs",
+        summary: "Store module root re-exporting `Store` struct.",
+        details: ["Re-exports `Store`."],
+        exports: "pub use sqlite::Store;"
+      },
+
+      // Data Types Layer
+      {
+        name: "protocol.rs",
+        path: "src/types/protocol.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Wire protocol DTOs, `CommandType` enum (34 commands), and `EventType` enum (12 events).",
+        details: [
+          "Defines `IpcRequest`, `IpcResponse`, `DaemonEvent`, `ErrorBody`.",
+          "Defines all valid command strings (`daemon.ping`, `session.connect`, `message.send_text`, `media.download`, etc.).",
+          "Defines all event strings (`event.connected`, `event.message`, `event.receipt`, etc.)."
+        ],
+        exports: "pub struct IpcRequest { ... }\npub struct IpcResponse { ... }\npub enum CommandType { ... }\npub enum EventType { ... }"
+      },
+      {
+        name: "session.rs",
+        path: "src/types/session.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Session state and daemon path status DTOs.",
+        details: ["Defines `SessionState`, `SessionStatus`, `DaemonStatus`, `DaemonPaths`, `PairCodePayload`."],
+        exports: "pub enum SessionState { Connected, Disconnected, LoggingIn, LoggedOut }\npub struct DaemonStatus { ... }"
+      },
+      {
+        name: "message.rs",
+        path: "src/types/message.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Message request/response and event payload DTOs.",
+        details: [
+          "Defines `SendTextPayload`, `SendMessagePayload`, `StoredMessagePayload`, `MessageEventPayload`, `ReceiptEventPayload`, `MessageReactPayload`."
+        ],
+        exports: "pub struct SendTextPayload { ... }\npub struct StoredMessagePayload { ... }"
+      },
+      {
+        name: "contact.rs",
+        path: "src/types/contact.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Contact information and profile picture payload DTOs.",
+        details: ["Defines `ContactPayload`, `ContactGetPayload`, `ContactProfilePicturePayload`."],
+        exports: "pub struct ContactPayload { ... }"
+      },
+      {
+        name: "media.rs",
+        path: "src/types/media.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Media download request and response DTOs.",
+        details: ["Defines `MediaDownloadPayload`, `MediaDownloadResultPayload`."],
+        exports: "pub struct MediaDownloadPayload { ... }"
+      },
+      {
+        name: "presence.rs",
+        path: "src/types/presence.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Presence and chat typing state DTOs.",
+        details: ["Defines `PresenceSetPayload`, `ChatStateSendPayload`."],
+        exports: "pub struct PresenceSetPayload { ... }"
+      },
+      {
+        name: "event.rs",
+        path: "src/types/event.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Event subscription payload DTOs.",
+        details: ["Defines `EventSubscribePayload`, `EventSubscriptionStatus`."],
+        exports: "pub struct EventSubscribePayload { ... }"
+      },
+      {
+        name: "mod.rs",
+        path: "src/types/mod.rs",
+        layer: "types",
+        icon: "rs",
+        summary: "Types module root re-exporting all domain DTOs.",
+        details: ["Re-exports protocol, session, message, contact, media, presence, event DTOs."],
+        exports: "pub use protocol::*;\npub use session::*;\npub use message::*;"
+      },
+
+      // Tests & Metadata
+      {
+        name: "Cargo.toml",
+        path: "Cargo.toml",
+        layer: "meta",
+        icon: "toml",
+        summary: "Cargo package manifest and dependency definitions.",
+        details: [
+          "Pins `edition = \"2024\"`.",
+          "Dependencies: `whatsapp-rust = \"0.6\"`, `tokio`, `diesel`, `clap`, `tracing`, `serde`, `uuid`."
+        ],
+        exports: "[package]\nname = \"whatsd\"\nversion = \"0.1.0\""
+      },
+      {
+        name: "rust-toolchain.toml",
+        path: "rust-toolchain.toml",
+        layer: "meta",
+        icon: "toml",
+        summary: "Nightly Rust toolchain pin for compiler consistency.",
+        details: [
+          "Pins `channel = \"nightly-2026-04-05\"` with components `rustfmt`, `clippy`, `rust-analyzer`, `rust-src`."
+        ],
+        exports: "channel = \"nightly-2026-04-05\""
+      },
+      {
+        name: "AGENTS.md",
+        path: "AGENTS.md",
+        layer: "meta",
+        icon: "md",
+        summary: "Project rules, Rust workflow directives, and security guidelines.",
+        details: [
+          "Mandates small reviewable changes, no panics in runtime paths, clean `cargo clippy` loops, and strict XDG socket permissions."
+        ],
+        exports: "# AGENTS.md\nProject guidelines & architecture rules"
+      },
+      {
+        name: "daemon-implementation-plan.md",
+        path: "docs/daemon-implementation-plan.md",
+        layer: "meta",
+        icon: "md",
+        summary: "Comprehensive 6-milestone daemon architecture & design specification document.",
+        details: [
+          "Details IPC protocol framing, XDG socket locations, durability strategy, security model, and milestone progression."
+        ],
+        exports: "# WhatsApp Daemon Implementation Plan"
+      },
+      {
+        name: "ipc_ping.rs",
+        path: "tests/ipc_ping.rs",
+        layer: "meta",
+        icon: "rs",
+        summary: "End-to-end integration test suite for Unix socket IPC communication.",
+        details: [
+          "Starts a test daemon instance on a temporary Unix socket.",
+          "Tests `daemon.ping`, `daemon.version`, `session.status`, `message.send_text`, `media.download`.",
+          "Tests subscription streams and graceful daemon shutdown."
+        ],
+        exports: "#[tokio::test]\nasync fn test_ipc_ping_flow()"
+      },
+      {
+        name: "store.rs",
+        path: "tests/store.rs",
+        layer: "meta",
+        icon: "rs",
+        summary: "Integration test suite for SQLite persistence store (`whatsd.db`).",
+        details: [
+          "Tests table migrations, idempotent message insertions, cursor updates, and query filtering."
+        ],
+        exports: "#[tokio::test]\nasync fn test_store_operations()"
+      }
+    ];
+
+    // Protocol Samples Data
+    const protocolData = [
+      {
+        name: "daemon.ping",
+        type: "COMMAND",
+        desc: "Health check command used by clients to verify daemon responsiveness.",
+        req: '{\n  "id": "e3a890a5-2983-4a1e-84b2-c1a90d98412b",\n  "type": "daemon.ping",\n  "payload": {}\n}',
+        res: '{\n  "id": "e3a890a5-2983-4a1e-84b2-c1a90d98412b",\n  "ok": true,\n  "payload": {\n    "pong": true\n  }\n}'
+      },
+      {
+        name: "session.status",
+        type: "COMMAND",
+        desc: "Returns current WhatsApp Web session connection state and paths.",
+        req: '{\n  "id": "8b9412f1-62c7-4d92-bf39-4d62194a821e",\n  "type": "session.status",\n  "payload": {}\n}',
+        res: '{\n  "id": "8b9412f1-62c7-4d92-bf39-4d62194a821e",\n  "ok": true,\n  "payload": {\n    "state": "Connected",\n    "account_id": "default",\n    "database_path": "/home/user/.local/state/whatsd/accounts/default/whatsapp.db",\n    "daemon_database_path": "/home/user/.local/state/whatsd/accounts/default/whatsd.db"\n  }\n}'
+      },
+      {
+        name: "message.send_text",
+        type: "COMMAND",
+        desc: "Sends a UTF-8 text message to a specific WhatsApp phone number or group JID.",
+        req: '{\n  "id": "14f6b89c-8512-421b-a912-4876b123910f",\n  "type": "message.send_text",\n  "payload": {\n    "recipient": "15550199@s.whatsapp.net",\n    "text": "Hello from whatsd daemon!"\n  }\n}',
+        res: '{\n  "id": "14f6b89c-8512-421b-a912-4876b123910f",\n  "ok": true,\n  "payload": {\n    "message_id": "3EB0A91283F1092841",\n    "status": "Sent"\n  }\n}'
+      },
+      {
+        name: "event.subscribe",
+        type: "COMMAND",
+        desc: "Subscribes the connected IPC client connection to live daemon event streams.",
+        req: '{\n  "id": "52c901a2-9b21-4d1a-8210-9941a87b1c11",\n  "type": "event.subscribe",\n  "payload": {\n    "events": ["event.message", "event.receipt", "event.connected"]\n  }\n}',
+        res: '{\n  "id": "52c901a2-9b21-4d1a-8210-9941a87b1c11",\n  "ok": true,\n  "payload": {\n    "subscribed": true\n  }\n}'
+      },
+      {
+        name: "event.message",
+        type: "EVENT",
+        desc: "Pushed by the daemon to subscribed clients whenever an inbound message is received and committed to local store.",
+        req: 'N/A (Daemon Pushed Event)',
+        res: '{\n  "type": "event.message",\n  "payload": {\n    "id": "3EB0F91209C481A",\n    "chat": "15550199@s.whatsapp.net",\n    "sender": "15550199@s.whatsapp.net",\n    "timestamp": 1774200000,\n    "text": "Hey, check out this daemon update!",\n    "is_from_me": false\n  }\n}'
+      }
+    ];
+
+    // Render Files Cards
+    let currentFilter = 'all';
+
+    function renderFiles() {
+      const grid = document.getElementById('files-grid');
+      const searchQuery = document.getElementById('file-search').value.toLowerCase();
+      grid.innerHTML = '';
+
+      const filtered = filesData.filter(file => {
+        const matchesFilter = currentFilter === 'all' || file.layer === currentFilter;
+        const matchesSearch = file.name.toLowerCase().includes(searchQuery) || 
+                              file.path.toLowerCase().includes(searchQuery) || 
+                              file.summary.toLowerCase().includes(searchQuery);
+        return matchesFilter && matchesSearch;
+      });
+
+      filtered.forEach((file, index) => {
+        const card = document.createElement('div');
+        card.className = 'file-card';
+        card.innerHTML = `
+          <div>
+            <div class="file-header">
+              <div class="file-title-wrap">
+                <div class="file-icon icon-${file.icon}">${file.icon.toUpperCase()}</div>
+                <div class="file-name">${file.name}</div>
+              </div>
+              <span class="file-layer-badge layer-${file.layer}">${file.layer}</span>
+            </div>
+            <p class="file-desc">${file.summary}</p>
+          </div>
+          <div class="file-meta-bar">
+            <span>${file.path}</span>
+            <button class="file-detail-btn" onclick="openModal(${index})">Details &rarr;</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function setFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-pill').forEach(pill => pill.classList.remove('active'));
+      el.classList.add('active');
+      renderFiles();
+    }
+
+    function filterFiles() {
+      renderFiles();
+    }
+
+    // Modal Handling
+    function openModal(index) {
+      const file = filesData[index];
+      document.getElementById('modal-filename').innerText = file.name;
+      document.getElementById('modal-filepath').innerText = file.path;
+      document.getElementById('modal-summary').innerText = file.summary;
+      
+      const list = document.getElementById('modal-responsibilities');
+      list.innerHTML = '';
+      file.details.forEach(item => {
+        const li = document.createElement('li');
+        li.innerText = item;
+        list.appendChild(li);
+      });
+
+      document.getElementById('modal-exports').innerText = file.exports;
+
+      document.getElementById('file-modal').classList.add('active');
+    }
+
+    function closeModal(event) {
+      if (event.target.id === 'file-modal') {
+        document.getElementById('file-modal').classList.remove('active');
+      }
+    }
+
+    function closeModalDirect() {
+      document.getElementById('file-modal').classList.remove('active');
+    }
+
+    // Protocol Inspector
+    function renderProtocolInspector() {
+      const list = document.getElementById('protocol-list');
+      list.innerHTML = '';
+
+      protocolData.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = `inspector-item ${index === 0 ? 'active' : ''}`;
+        div.onclick = () => selectProtocol(index, div);
+        div.innerHTML = `
+          <span class="inspector-item-name">${item.name}</span>
+          <span class="inspector-item-tag">${item.type}</span>
+        `;
+        list.appendChild(div);
+      });
+
+      selectProtocol(0, list.children[0]);
+    }
+
+    function selectProtocol(index, el) {
+      document.querySelectorAll('.inspector-item').forEach(item => item.classList.remove('active'));
+      if(el) el.classList.add('active');
+
+      const item = protocolData[index];
+      document.getElementById('preview-title').innerText = item.name;
+      document.getElementById('preview-type').innerText = item.type;
+      document.getElementById('preview-type').className = `badge ${item.type === 'COMMAND' ? 'badge-emerald' : 'badge-violet'}`;
+      document.getElementById('preview-desc').innerText = item.desc;
+      document.getElementById('preview-req').innerText = item.req;
+      document.getElementById('preview-res').innerText = item.res;
+    }
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.getElementById('tab-architecture').classList.add('hidden');
+      document.getElementById('tab-files').classList.add('hidden');
+      document.getElementById('tab-protocol').classList.add('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      if (tabId === 'architecture') {
+        document.getElementById('tab-architecture').classList.remove('hidden');
+        event.currentTarget.classList.add('active');
+      } else if (tabId === 'files') {
+        document.getElementById('tab-files').classList.remove('hidden');
+        event.currentTarget.classList.add('active');
+        renderFiles();
+      } else if (tabId === 'protocol') {
+        document.getElementById('tab-protocol').classList.remove('hidden');
+        event.currentTarget.classList.add('active');
+        renderProtocolInspector();
+      }
+    }
+
+    // Node click handler in architecture SVG
+    function showNodeDetails(nodeKey) {
+      switchTab('files');
+      let filter = 'all';
+      if (nodeKey === 'socket' || nodeKey === 'ipc_server') filter = 'ipc';
+      if (nodeKey === 'session_mgr' || nodeKey === 'whatsapp_bot') filter = 'session';
+      if (nodeKey === 'store') filter = 'store';
+      
+      const pill = Array.from(document.querySelectorAll('.filter-pill')).find(p => p.innerText.toLowerCase().includes(filter));
+      if (pill) setFilter(filter, pill);
+    }
+
+    // Initial load
+    renderFiles();
+  </script>
+</body>
+</html>
