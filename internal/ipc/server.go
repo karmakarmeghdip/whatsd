@@ -220,6 +220,27 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 			})
 		}
 
+	case "send_media":
+		to, _ := req.Params["to"].(string)
+		mediaType, _ := req.Params["media_type"].(string)
+		filePath, _ := req.Params["file_path"].(string)
+		caption, _ := req.Params["caption"].(string)
+		fileName, _ := req.Params["file_name"].(string)
+
+		if to == "" || mediaType == "" || filePath == "" {
+			s.sendError(conn, req.ID, "missing required params 'to', 'media_type', or 'file_path'")
+			return
+		}
+		id, ts, err := s.waClient.SendMedia(ctx, to, mediaType, filePath, caption, fileName)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, types.SendMessageResult{
+				ID:        id,
+				Timestamp: ts,
+			})
+		}
+
 	case "logout":
 		err := s.waClient.Logout(ctx)
 		if err != nil {
@@ -228,8 +249,72 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 			s.sendResult(conn, req.ID, map[string]string{"status": "logged_out"})
 		}
 
+	case "get_chats":
+		limit := parseIntParam(req.Params["limit"], 50)
+		chats, err := s.waClient.GetChats(ctx, limit)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, chats)
+		}
+
+	case "get_messages":
+		chat, _ := req.Params["chat"].(string)
+		if chat == "" {
+			s.sendError(conn, req.ID, "missing required param 'chat'")
+			return
+		}
+		limit := parseIntParam(req.Params["limit"], 50)
+		beforeID, _ := req.Params["before_id"].(string)
+		messages, err := s.waClient.GetMessages(ctx, chat, limit, beforeID)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, messages)
+		}
+
+	case "mark_read":
+		chat, _ := req.Params["chat"].(string)
+		if chat == "" {
+			s.sendError(conn, req.ID, "missing required param 'chat'")
+			return
+		}
+		err := s.waClient.MarkRead(ctx, chat)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
+	case "download_media":
+		id, _ := req.Params["message_id"].(string)
+		if id == "" {
+			s.sendError(conn, req.ID, "missing required param 'message_id'")
+			return
+		}
+		path, err := s.waClient.DownloadMedia(ctx, id)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"file_path": path})
+		}
+
 	default:
 		s.sendError(conn, req.ID, fmt.Sprintf("unknown method: %s", req.Method))
+	}
+}
+
+func parseIntParam(v any, defaultVal int) int {
+	if v == nil {
+		return defaultVal
+	}
+	switch val := v.(type) {
+	case float64:
+		return int(val)
+	case int:
+		return val
+	default:
+		return defaultVal
 	}
 }
 

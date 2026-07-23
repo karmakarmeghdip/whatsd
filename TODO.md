@@ -2,63 +2,63 @@
 
 This document outlines the phased roadmap for `whatsd` to achieve feature parity with WhatsApp Desktop. Each task is self-contained, designed to be implemented by an AI agent in a single turn, and independently testable using `whatsctl`.
 
-Tasks are strictly prioritized: **Phase 1 & 2** cover daily critical messaging features, while **Phases 3 to 5** add rich group management, persistent history, and extended capabilities.
+Tasks are strictly prioritized: **Phase 1** establishes durable local message storage and chat history querying (essential for client UIs to render conversations), followed by **Phase 2** for media and interactive messaging, and **Phases 3 to 5** for group management, extended features, and resilience.
 
 ---
 
-## Phase 1: Essential Daily Messaging
+## Phase 1: Local Storage, History Sync & Message Lifecycle (Highest Priority)
 
-- [ ] **1. Media Message Receiving & Downloading**
-  - **Goal**: Support receiving images, audio/voice notes, videos, documents, and stickers over IPC, with optional local file downloading.
+- [x] **1. Local Message History & Chat Persistence in SQLite**
+  - **Goal**: Maintain local message and chat state in SQLite so clients (desktop apps, Emacs packages, CLI) can query message history and chat lists without relying solely on real-time WebSocket events.
+  - **IPC Protocol**: Add IPC method `get_chats` (returns list of chats with last message preview, unread count, timestamp) and `get_messages` (params: `chat` JID, `limit` int, `before_id` string).
+  - **Storage Architecture**: Expand `internal/store` or add `internal/history` package with tables for `chats` and `messages`. Save all incoming and outgoing messages transactionally.
+  - **Verification**: Send/receive messages, restart `whatsd`, run `whatsctl chats` and `whatsctl history --chat <jid>` to verify past messages persist across daemon restarts and can be paginated.
+
+- [x] **2. History Sync Processing**
+  - **Goal**: Handle initial WhatsApp history synchronization data (recent chats, contact names, past message history) when pairing a new device or reconnecting.
+  - **IPC Protocol**: Emit `history_sync_progress` event (data: `progress_percent`, `sync_type`).
+  - **whatsmeow API**: Handle `*events.HistorySync` events from `whatsmeow` and ingest initial message/chat batches into local SQLite store.
+  - **Verification**: Pair daemon via QR, verify incoming `history_sync_progress` events, and confirm historical chats and past messages are populated in `whatsctl chats` and `whatsctl history`.
+
+- [ ] **3. Message Editing & Revocation (Delete for Everyone / Delete for Me)**
+  - **Goal**: Support editing sent text messages and revoking/deleting messages locally and on remote devices.
+  - **IPC Protocol**: Add `edit_message` method (params: `chat` JID, `message_id`, `new_text`). Add `revoke_message` method (params: `chat` JID, `message_id`). Broadcast `message_edit` and `message_revoke` push events.
+  - **whatsmeow API**: Use `cli.BuildEdit(chatJID, msgID, newTextMsg)` and `cli.BuildRevoke(chatJID, senderJID, msgID)`.
+  - **Verification**: `whatsctl edit --chat <jid> --id <msg_id> --text "Edited text"` updates message locally and on recipient's device; `whatsctl revoke --chat <jid> --id <msg_id>` deletes message for everyone.
+
+---
+
+## Phase 2: Rich Media & Interactive Messaging
+
+- [x] **4. Media Message Receiving & Downloading**
+  - **Goal**: Support receiving images, audio/voice notes, videos, documents, and stickers over IPC, with local file downloading.
   - **IPC Protocol**: Extend `message` event payload in `internal/types/types.go` to include `media_type` (`image`, `video`, `audio`, `document`, `sticker`), `caption`, `file_name`, `mime_type`, and `file_length`. Add IPC method `download_media` taking `message_id` and `chat_jid`, saving the decrypted payload to `~/.local/share/whatsd/media/` and returning the local file path.
   - **whatsmeow API**: Use `cli.Download(...)` or `cli.DownloadToFile(...)`.
   - **Verification**: Send an image or audio note to the account from a phone, verify `whatsctl listen` prints media metadata, and run `whatsctl download --id <msg_id> --chat <jid>` to verify local file creation.
 
-- [ ] **2. Media Message Sending**
+- [x] **5. Media Message Sending**
   - **Goal**: Allow sending images, audio, videos, and documents to contacts/groups.
   - **IPC Protocol**: Add `send_media` method to IPC. Params: `to` (JID), `media_type` (`image`|`video`|`audio`|`document`), `file_path` (local path), `caption` (optional string), `file_name` (optional string).
   - **whatsmeow API**: Upload file using `cli.Upload(...)`, construct appropriate `*waE2E.ImageMessage` / `*waE2E.DocumentMessage` etc., and dispatch with `cli.SendMessage(...)`.
   - **Verification**: `whatsctl send-media --to <jid> --file /path/to/img.png --caption "Test image"` sends the media successfully.
 
-- [ ] **3. Read Receipts & Delivery Receipts**
+- [ ] **6. Read Receipts & Delivery Receipts**
   - **Goal**: Send read receipts when a client views a chat, and emit receipt events (`delivered`, `read`, `played`) when sent messages are read by recipients.
   - **IPC Protocol**: Add IPC method `mark_read` (params: `chat` JID, `message_ids` array). Add `receipt` push event notification containing `message_id`, `chat`, `sender`, `type` (`read`|`delivered`|`played`), and `timestamp`.
   - **whatsmeow API**: Use `cli.MarkRead(...)` and listen for `*events.Receipt`.
   - **Verification**: Call `whatsctl mark-read --chat <jid> --ids <msg_id>`, observe blue ticks on sender's WhatsApp app; send a message from `whatsctl send` and observe `receipt` event in `whatsctl listen` when recipient opens it.
 
-- [ ] **4. Typing & Presence Indicators**
+- [ ] **7. Typing & Presence Indicators**
   - **Goal**: Send presence updates ("composing", "recording", "paused") and emit incoming presence events from contacts.
   - **IPC Protocol**: Add `send_presence` method (params: `chat` JID, `state` (`composing`|`recording`|`paused`)). Broadcast `presence` event (data: `sender` JID, `state`, `last_seen`).
   - **whatsmeow API**: `cli.SendChatPresence(chatJID, waTypes.PresenceComposing, waTypes.ChatPresenceMediaText)` and listen for `*events.Presence`.
   - **Verification**: `whatsctl presence --chat <jid> --state composing` shows "typing..." on phone; typing on phone emits presence event in `whatsctl listen`.
 
-- [ ] **5. Message Quoting / Replies & Emoji Reactions**
+- [ ] **8. Message Quoting / Replies & Emoji Reactions**
   - **Goal**: Support replying to specific messages and sending/receiving emoji reactions.
   - **IPC Protocol**: Extend `send_message` with `reply_to_id` parameter. Add IPC method `react_message` (params: `chat` JID, `message_id`, `emoji` string). Broadcast `reaction` event (data: `message_id`, `sender`, `emoji`).
   - **whatsmeow API**: Construct `waE2E.ContextInfo` with `StanzaID` & `Participant` for replies; use `cli.SendMessage` with `waE2E.ReactionMessage` for reactions. Listen for `*events.Message` containing `ReactionMessage`.
   - **Verification**: `whatsctl react --chat <jid> --id <msg_id> --emoji "👍"` adds reaction to target message; reacting on phone broadcasts reaction event in `whatsctl listen`.
-
----
-
-## Phase 2: Message & Chat Lifecycle Management
-
-- [ ] **6. Message Editing & Revocation (Delete for Everyone / Delete for Me)**
-  - **Goal**: Support editing sent text messages and revoking/deleting messages.
-  - **IPC Protocol**: Add `edit_message` method (params: `chat` JID, `message_id`, `new_text`). Add `revoke_message` method (params: `chat` JID, `message_id`). Broadcast `message_edit` and `message_revoke` push events.
-  - **whatsmeow API**: Use `cli.BuildEdit(chatJID, msgID, newTextMsg)` and `cli.BuildRevoke(chatJID, senderJID, msgID)`.
-  - **Verification**: `whatsctl edit --chat <jid> --id <msg_id> --text "Edited text"` updates message on recipient's device; `whatsctl revoke --chat <jid> --id <msg_id>` deletes message for everyone.
-
-- [ ] **7. Local Message History & Chat Persistence in SQLite**
-  - **Goal**: Maintain local message and chat state in SQLite so clients can query message history without relying solely on real-time WebSocket events.
-  - **IPC Protocol**: Add IPC method `get_chats` (returns list of chats with last message, unread count) and `get_messages` (params: `chat` JID, `limit` int, `before_id` string).
-  - **Storage Architecture**: Expand `internal/store` schema or add `history_store` package to record incoming/outgoing messages and update chat metadata transactionally.
-  - **Verification**: Send/receive messages, restart `whatsd`, run `whatsctl chats` and `whatsctl history --chat <jid>` to verify past messages persist across daemon restarts.
-
-- [ ] **8. History Sync Processing**
-  - **Goal**: Handle initial WhatsApp history synchronization data (recent chats, contact names, past messages) when pairing a new device.
-  - **IPC Protocol**: Emit `history_sync_progress` event (data: `progress_percent`, `sync_type`).
-  - **whatsmeow API**: Handle `*events.HistorySync` events from `whatsmeow` and ingest initial message batches into local SQLite store.
-  - **Verification**: Pair daemon via QR, verify incoming `history_sync_progress` events, and confirm historical chats are populated in `whatsctl chats`.
 
 ---
 

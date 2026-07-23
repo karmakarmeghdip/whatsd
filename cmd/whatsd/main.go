@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"whatsd/internal/config"
+	"whatsd/internal/history"
 	"whatsd/internal/ipc"
 	"whatsd/internal/store"
 	"whatsd/internal/types"
@@ -31,7 +32,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	container, deviceStore, err := store.InitStore(ctx, cfg.DBPath, nil)
+	container, deviceStore, db, err := store.InitStore(ctx, cfg.DBPath, nil)
 	if err != nil {
 		slog.Error("failed to initialize SQLite store", "err", err)
 		os.Exit(1)
@@ -40,9 +41,15 @@ func main() {
 		_ = container.Close()
 	}()
 
+	historyStore, err := history.NewStore(db)
+	if err != nil {
+		slog.Error("failed to initialize history store", "err", err)
+		os.Exit(1)
+	}
+
 	var ipcServer *ipc.Server
 
-	waClient, err := whatsapp.NewClient(deviceStore, func(evt types.EventNotification) {
+	waClient, err := whatsapp.NewClient(deviceStore, historyStore, func(evt types.EventNotification) {
 		if ipcServer != nil {
 			ipcServer.Broadcast(evt)
 		}
