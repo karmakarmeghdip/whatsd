@@ -137,3 +137,56 @@ func TestGetMessagesPagination(t *testing.T) {
 		t.Errorf("expected msg-1, got %s", paginated[0].ID)
 	}
 }
+
+func TestSetChatState(t *testing.T) {
+	s, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	ourJID := "me@s.whatsapp.net"
+	chatJID := "friend@s.whatsapp.net"
+
+	msg := types.MessageItem{
+		ID:        "msg-1",
+		Chat:      chatJID,
+		Sender:    chatJID,
+		Timestamp: time.Now(),
+		Text:      "Hey!",
+	}
+	if err := s.SaveMessage(ctx, msg); err != nil {
+		t.Fatalf("SaveMessage failed: %v", err)
+	}
+
+	// Test Pin
+	if err := s.SetChatState(ctx, ourJID, chatJID, "pin", 0); err != nil {
+		t.Fatalf("SetChatState pin failed: %v", err)
+	}
+
+	chats, err := s.GetChats(ctx, 10)
+	if err != nil || len(chats) != 1 {
+		t.Fatalf("GetChats failed: %v", err)
+	}
+	if !chats[0].IsPinned {
+		t.Errorf("expected chat to be pinned")
+	}
+
+	// Test Mute
+	if err := s.SetChatState(ctx, ourJID, chatJID, "mute", 8*time.Hour); err != nil {
+		t.Fatalf("SetChatState mute failed: %v", err)
+	}
+
+	chats, _ = s.GetChats(ctx, 10)
+	if !chats[0].IsMuted {
+		t.Errorf("expected chat to be muted")
+	}
+
+	// Test Archive
+	if err := s.SetChatState(ctx, ourJID, chatJID, "archive", 0); err != nil {
+		t.Fatalf("SetChatState archive failed: %v", err)
+	}
+
+	chats, _ = s.GetChats(ctx, 10)
+	if !chats[0].IsArchived {
+		t.Errorf("expected chat to be archived")
+	}
+}

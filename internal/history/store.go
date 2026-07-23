@@ -378,3 +378,50 @@ func (s *Store) GetContactsFromChats(ctx context.Context) ([]types.ContactItem, 
 	}
 	return items, nil
 }
+
+// SetChatState updates local chat settings (muted_until, pinned, archived) in SQLite.
+func (s *Store) SetChatState(ctx context.Context, ourJID string, chatJID string, action string, muteDuration time.Duration) error {
+	var mutedUntil int64 = 0
+	if action == "mute" {
+		if muteDuration > 0 {
+			mutedUntil = time.Now().Add(muteDuration).Unix()
+		} else {
+			mutedUntil = time.Now().Add(100 * 365 * 24 * time.Hour).Unix()
+		}
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	upsertSQL := `
+	INSERT INTO whatsmeow_chat_settings (our_jid, chat_jid, muted_until, pinned, archived)
+	VALUES (?, ?, ?, ?, ?)
+	ON CONFLICT(our_jid, chat_jid) DO UPDATE SET
+		muted_until = CASE WHEN ? = 'mute' THEN excluded.muted_until WHEN ? = 'unmute' THEN 0 ELSE whatsmeow_chat_settings.muted_until END,
+		pinned = CASE WHEN ? = 'pin' THEN 1 WHEN ? = 'unpin' THEN 0 ELSE whatsmeow_chat_settings.pinned END,
+		archived = CASE WHEN ? = 'archive' THEN 1 WHEN ? = 'unarchive' THEN 0 ELSE whatsmeow_chat_settings.archived END;
+	`
+
+	var isPinned, isArchived bool
+	if action == "pin" {
+		isPinned = true
+	}
+	if action == "archive" {
+		isArchived = true
+	}
+
+	_, err = tx.ExecContext(ctx, upsertSQL,
+		ourJID, chatJID, mutedUntil, isPinned, isArchived,
+		action, action,
+		action, action,
+		action, action,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert chat settings: %w", err)
+	}
+
+	return tx.Commit()
+}

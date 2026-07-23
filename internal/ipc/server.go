@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"whatsd/internal/types"
 	"whatsd/internal/whatsapp"
@@ -381,9 +382,130 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 			s.sendResult(conn, req.ID, map[string]string{"file_path": path})
 		}
 
+	case "get_group_info":
+		groupJID, _ := req.Params["group_jid"].(string)
+		if groupJID == "" {
+			s.sendError(conn, req.ID, "missing required param 'group_jid'")
+			return
+		}
+		info, err := s.waClient.GetGroupInfo(ctx, groupJID)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, info)
+		}
+
+	case "create_group":
+		title, _ := req.Params["title"].(string)
+		participants := parseStringSliceParam(req.Params["participants"])
+		if title == "" {
+			s.sendError(conn, req.ID, "missing required param 'title'")
+			return
+		}
+		info, err := s.waClient.CreateGroup(ctx, title, participants)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, info)
+		}
+
+	case "update_group_members":
+		groupJID, _ := req.Params["group_jid"].(string)
+		action, _ := req.Params["action"].(string)
+		participants := parseStringSliceParam(req.Params["participants"])
+		if groupJID == "" || action == "" {
+			s.sendError(conn, req.ID, "missing required params 'group_jid' or 'action'")
+			return
+		}
+		members, err := s.waClient.UpdateGroupMembers(ctx, groupJID, action, participants)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, members)
+		}
+
+	case "get_contact":
+		jid, _ := req.Params["jid"].(string)
+		if jid == "" {
+			s.sendError(conn, req.ID, "missing required param 'jid'")
+			return
+		}
+		contact, err := s.waClient.GetContact(ctx, jid)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, contact)
+		}
+
+	case "get_profile_picture":
+		jid, _ := req.Params["jid"].(string)
+		if jid == "" {
+			s.sendError(conn, req.ID, "missing required param 'jid'")
+			return
+		}
+		preview, _ := req.Params["preview"].(bool)
+		pic, err := s.waClient.GetProfilePicture(ctx, jid, preview)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, pic)
+		}
+
+	case "set_chat_state":
+		chat, _ := req.Params["chat"].(string)
+		action, _ := req.Params["action"].(string)
+		if chat == "" || action == "" {
+			s.sendError(conn, req.ID, "missing required params 'chat' or 'action'")
+			return
+		}
+		duration := parseDurationParam(req.Params["mute_duration"])
+		err := s.waClient.SetChatState(ctx, chat, action, duration)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
 	default:
 		s.sendError(conn, req.ID, fmt.Sprintf("unknown method: %s", req.Method))
 	}
+}
+
+func parseDurationParam(v any) time.Duration {
+	if v == nil {
+		return 0
+	}
+	switch val := v.(type) {
+	case string:
+		d, err := time.ParseDuration(val)
+		if err == nil {
+			return d
+		}
+		return 0
+	case float64:
+		return time.Duration(val) * time.Second
+	case int:
+		return time.Duration(val) * time.Second
+	default:
+		return 0
+	}
+}
+
+func parseStringSliceParam(v any) []string {
+	if v == nil {
+		return nil
+	}
+	var res []string
+	if slice, ok := v.([]any); ok {
+		for _, item := range slice {
+			if s, ok := item.(string); ok && s != "" {
+				res = append(res, s)
+			}
+		}
+	} else if sliceStr, ok := v.([]string); ok {
+		return sliceStr
+	}
+	return res
 }
 
 func parseIntParam(v any, defaultVal int) int {

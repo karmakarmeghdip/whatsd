@@ -153,3 +153,42 @@ type QREventData struct {
 	Err     string `json:"error,omitempty"`
 	Success bool   `json:"success,omitempty"`
 }
+
+// GroupParticipant represents a member of a group chat.
+type GroupParticipant struct {
+	JID          string `json:"jid"`
+	IsAdmin      bool   `json:"is_admin"`
+	IsSuperAdmin bool   `json:"is_super_admin"`
+	Error        int    `json:"error,omitempty"`
+}
+
+// GroupInfoResult contains metadata and participant details of a group.
+type GroupInfoResult struct {
+	JID         string             `json:"jid"`
+	Owner       string             `json:"owner,omitempty"`
+	Title       string             `json:"title"`
+	Topic       string             `json:"topic,omitempty"`
+	TopicSetBy  string             `json:"topic_set_by,omitempty"`
+	TopicSetAt  time.Time          `json:"topic_set_at,omitempty"`
+	IsLocked    bool               `json:"is_locked"`
+	IsAnnounce  bool               `json:"is_announce"`
+	Members     []GroupParticipant `json:"members"`
+	MemberCount int                `json:"member_count"`
+}
+
+// ContactInfoResult contains detailed contact status and info.
+type ContactInfoResult struct {
+	JID          string `json:"jid"`
+	IsOnWhatsApp bool   `json:"is_on_whatsapp"`
+	Status       string `json:"status,omitempty"`
+	VerifiedName string `json:"verified_name,omitempty"`
+	PictureID    string `json:"picture_id,omitempty"`
+}
+
+// ProfilePictureResult contains the picture URL, ID, and optional local file path.
+type ProfilePictureResult struct {
+	JID      string `json:"jid"`
+	URL      string `json:"url,omitempty"`
+	ID       string `json:"id,omitempty"`
+	FilePath string `json:"file_path,omitempty"`
+}

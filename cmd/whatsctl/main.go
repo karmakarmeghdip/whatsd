@@ -173,6 +173,84 @@ func main() {
 		}
 		handleDownload(cfg.SocketPath, *id, *chat)
 
+	case "group-info":
+		groupInfoFlags := flag.NewFlagSet("group-info", flag.ExitOnError)
+		jid := groupInfoFlags.String("jid", "", "Group JID")
+		_ = groupInfoFlags.Parse(os.Args[2:])
+
+		if *jid == "" {
+			fmt.Println("Error: --jid is required")
+			groupInfoFlags.Usage()
+			os.Exit(1)
+		}
+		handleGroupInfo(cfg.SocketPath, *jid)
+
+	case "create-group":
+		createGroupFlags := flag.NewFlagSet("create-group", flag.ExitOnError)
+		title := createGroupFlags.String("title", "", "Group title/name")
+		participants := createGroupFlags.String("participants", "", "Comma-separated list of participant phone numbers or JIDs")
+		_ = createGroupFlags.Parse(os.Args[2:])
+
+		if *title == "" {
+			fmt.Println("Error: --title is required")
+			createGroupFlags.Usage()
+			os.Exit(1)
+		}
+		handleCreateGroup(cfg.SocketPath, *title, *participants)
+
+	case "group-members":
+		groupMembersFlags := flag.NewFlagSet("group-members", flag.ExitOnError)
+		jid := groupMembersFlags.String("jid", "", "Group JID")
+		action := groupMembersFlags.String("action", "", "Member action (add|remove|promote|demote)")
+		participants := groupMembersFlags.String("participants", "", "Comma-separated list of participant phone numbers or JIDs")
+		_ = groupMembersFlags.Parse(os.Args[2:])
+
+		if *jid == "" || *action == "" || *participants == "" {
+			fmt.Println("Error: --jid, --action, and --participants are required")
+			groupMembersFlags.Usage()
+			os.Exit(1)
+		}
+		handleGroupMembers(cfg.SocketPath, *jid, *action, *participants)
+
+	case "contact":
+		contactFlags := flag.NewFlagSet("contact", flag.ExitOnError)
+		jid := contactFlags.String("jid", "", "Contact phone number or JID")
+		_ = contactFlags.Parse(os.Args[2:])
+
+		if *jid == "" {
+			fmt.Println("Error: --jid is required")
+			contactFlags.Usage()
+			os.Exit(1)
+		}
+		handleContact(cfg.SocketPath, *jid)
+
+	case "avatar":
+		avatarFlags := flag.NewFlagSet("avatar", flag.ExitOnError)
+		jid := avatarFlags.String("jid", "", "Contact or Group JID")
+		preview := avatarFlags.Bool("preview", false, "Fetch low-res preview image")
+		_ = avatarFlags.Parse(os.Args[2:])
+
+		if *jid == "" {
+			fmt.Println("Error: --jid is required")
+			avatarFlags.Usage()
+			os.Exit(1)
+		}
+		handleAvatar(cfg.SocketPath, *jid, *preview)
+
+	case "chat-state":
+		chatStateFlags := flag.NewFlagSet("chat-state", flag.ExitOnError)
+		chat := chatStateFlags.String("chat", "", "Chat JID")
+		action := chatStateFlags.String("action", "", "Action (mute|unmute|pin|unpin|archive|unarchive)")
+		duration := chatStateFlags.String("duration", "", "Optional mute duration (e.g. 8h, 24h)")
+		_ = chatStateFlags.Parse(os.Args[2:])
+
+		if *chat == "" || *action == "" {
+			fmt.Println("Error: --chat and --action are required")
+			chatStateFlags.Usage()
+			os.Exit(1)
+		}
+		handleChatState(cfg.SocketPath, *chat, *action, *duration)
+
 	case "listen":
 		handleListen(cfg.SocketPath)
 
@@ -200,6 +278,12 @@ func printUsage() {
 	fmt.Println("  presence --chat <jid> --state <state> Send presence state")
 	fmt.Println("  chats [--limit N]     List active chats with last message preview and unread count")
 	fmt.Println("  contacts [--query Q]  Search contacts directory by name, push name, or JID")
+	fmt.Println("  contact --jid <jid>   Fetch contact info, status, and verified business status")
+	fmt.Println("  avatar --jid <jid> [--preview] Download profile picture or group photo")
+	fmt.Println("  chat-state --chat <jid> --action <mute|unmute|pin|unpin|archive|unarchive> [--duration <dur>] Set chat state")
+	fmt.Println("  group-info --jid <jid> Get group metadata and member list")
+	fmt.Println("  create-group --title <title> [--participants <jids>] Create new group chat")
+	fmt.Println("  group-members --jid <jid> --action <add|remove|promote|demote> --participants <jids> Manage group members")
 	fmt.Println("  history --chat <jid>  Query message history for a chat")
 	fmt.Println("  mark-read --chat <jid> [--ids <id1,id2>] Reset unread count and mark messages read")
 	fmt.Println("  download --id <msg_id> [--chat <jid>] Download media for a message")

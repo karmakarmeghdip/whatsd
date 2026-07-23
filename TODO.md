@@ -64,7 +64,7 @@ Tasks are strictly prioritized: **Phase 1** establishes durable local message st
 
 ## Phase 3: Group & Contact Management
 
-- [ ] **9. Group Info, Member List & Group Management**
+- [x] **9. Group Info, Member List & Group Management**
   - **Goal**: Inspect group metadata, list participants, create groups, and manage members (add/remove/promote/demote).
   - **IPC Protocol**:
     - `get_group_info` (params: `group_jid` -> returns title, topic, owner, members, roles).
@@ -73,13 +73,13 @@ Tasks are strictly prioritized: **Phase 1** establishes durable local message st
   - **whatsmeow API**: `cli.GetGroupInfo(...)`, `cli.CreateGroup(...)`, `cli.UpdateGroupParticipants(...)`.
   - **Verification**: `whatsctl group-info --jid <group_jid>` prints member list and roles; test adding/removing members via `whatsctl`.
 
-- [ ] **10. Contact Info & Profile Picture Fetching**
+- [x] **10. Contact Info & Profile Picture Fetching**
   - **Goal**: Fetch contact details, status text, and profile picture URLs or binary images.
   - **IPC Protocol**: Add `get_contact` (params: `jid`) and `get_profile_picture` (params: `jid`, `preview` bool -> returns image file path or URL).
   - **whatsmeow API**: `cli.IsOnWhatsApp(...)`, `cli.GetUserInfo(...)`, `cli.GetProfilePictureInfo(...)`.
   - **Verification**: `whatsctl contact --jid <jid>` returns contact status; `whatsctl avatar --jid <jid>` downloads and prints path to avatar image.
 
-- [ ] **11. App State Sync (Mute, Pin, Archive Chats)**
+- [x] **11. App State Sync (Mute, Pin, Archive Chats)**
   - **Goal**: Support muting/unmuting chats, pinning/unpinning chats, and archiving/unarchiving chats synced across devices.
   - **IPC Protocol**: Add `set_chat_state` (params: `chat` JID, `action` (`mute`|`unmute`|`pin`|`unpin`|`archive`|`unarchive`), `mute_duration` int).
   - **whatsmeow API**: Use `cli.SendAppState(...)` / appstate patches for `Mute`, `Pin`, `Archive`.
