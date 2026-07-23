@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -464,6 +465,114 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 			s.sendError(conn, req.ID, err.Error())
 		} else {
 			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
+	case "post_status":
+		text, _ := req.Params["text"].(string)
+		filePath, _ := req.Params["file_path"].(string)
+		mediaType, _ := req.Params["media_type"].(string)
+		caption, _ := req.Params["caption"].(string)
+		res, err := s.waClient.PostStatus(ctx, types.PostStatusParams{
+			Text:      text,
+			FilePath:  filePath,
+			MediaType: mediaType,
+			Caption:   caption,
+		})
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, res)
+		}
+
+	case "get_statuses":
+		limit := parseIntParam(req.Params["limit"], 50)
+		statuses, err := s.waClient.GetStatuses(ctx, limit)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, statuses)
+		}
+
+	case "get_newsletters":
+		newsletters, err := s.waClient.GetSubscribedNewsletters(ctx)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, newsletters)
+		}
+
+	case "follow_newsletter":
+		newsletterJID, _ := req.Params["newsletter_jid"].(string)
+		unfollow, _ := req.Params["unfollow"].(bool)
+		if newsletterJID == "" {
+			s.sendError(conn, req.ID, "missing required param 'newsletter_jid'")
+			return
+		}
+		err := s.waClient.FollowNewsletter(ctx, newsletterJID, unfollow)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
+	case "get_newsletter_messages":
+		newsletterJID, _ := req.Params["newsletter_jid"].(string)
+		if newsletterJID == "" {
+			s.sendError(conn, req.ID, "missing required param 'newsletter_jid'")
+			return
+		}
+		limit := parseIntParam(req.Params["limit"], 50)
+		beforeID := int64(parseIntParam(req.Params["before_id"], 0))
+		msgs, err := s.waClient.GetNewsletterMessages(ctx, newsletterJID, limit, beforeID)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, msgs)
+		}
+
+	case "get_blocklist":
+		blocklist, err := s.waClient.GetBlocklist(ctx)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, blocklist)
+		}
+
+	case "block_contact":
+		jid, _ := req.Params["jid"].(string)
+		action, _ := req.Params["action"].(string)
+		if jid == "" {
+			s.sendError(conn, req.ID, "missing required param 'jid'")
+			return
+		}
+		unblock := strings.ToLower(action) == "unblock"
+		blocklist, err := s.waClient.BlockContact(ctx, jid, unblock)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, blocklist)
+		}
+
+	case "get_privacy_settings":
+		settings, err := s.waClient.GetPrivacySettings(ctx)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, settings)
+		}
+
+	case "set_privacy_setting":
+		setting, _ := req.Params["setting"].(string)
+		value, _ := req.Params["value"].(string)
+		if setting == "" || value == "" {
+			s.sendError(conn, req.ID, "missing required params 'setting' or 'value'")
+			return
+		}
+		settings, err := s.waClient.SetPrivacySetting(ctx, setting, value)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, settings)
 		}
 
 	default:

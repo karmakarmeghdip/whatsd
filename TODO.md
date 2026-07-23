@@ -89,19 +89,19 @@ Tasks are strictly prioritized: **Phase 1** establishes durable local message st
 
 ## Phase 4: Extended WhatsApp Features
 
-- [ ] **12. Status / Stories Viewing & Posting**
+- [x] **12. Status / Stories Viewing & Posting**
   - **Goal**: Receive status/story updates from contacts and post text/media status updates.
   - **IPC Protocol**: Add `get_statuses` (returns recent status posts) and `post_status` (params: `text` or `file_path`). Broadcast `status_update` event.
   - **whatsmeow API**: Send messages to `status@broadcast` JID.
   - **Verification**: Posting status via `whatsctl post-status --text "Hello"` displays status on phone contacts' feeds.
 
-- [ ] **13. Newsletter / Channels Support**
+- [x] **13. Newsletter / Channels Support**
   - **Goal**: Follow channels, read channel updates, and list subscribed newsletters.
   - **IPC Protocol**: `get_newsletters`, `follow_newsletter` (params: `newsletter_jid`), `get_newsletter_messages` (params: `newsletter_jid`).
   - **whatsmeow API**: `cli.GetNewsletterInfo(...)`, `cli.FollowNewsletter(...)`, `cli.GetNewsletterMessages(...)`.
   - **Verification**: `whatsctl newsletters` lists followed channels and recent posts.
 
-- [ ] **14. Blocklist & Privacy Settings Management**
+- [x] **14. Blocklist & Privacy Settings Management**
   - **Goal**: View blocked contacts, block/unblock contacts, and configure privacy settings (last seen, profile photo, read receipts).
   - **IPC Protocol**: `get_blocklist`, `block_contact` (params: `jid`, `action` (`block`|`unblock`)), `get_privacy_settings`, `set_privacy_setting`.
   - **whatsmeow API**: `cli.GetBlocklist()`, `cli.UpdateBlocklist()`, `cli.GetPrivacySettings()`, `cli.SetPrivacySetting()`.

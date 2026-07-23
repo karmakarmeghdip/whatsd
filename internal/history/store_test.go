@@ -190,3 +190,35 @@ func TestSetChatState(t *testing.T) {
 		t.Errorf("expected chat to be archived")
 	}
 }
+
+func TestStatusMessageHistory(t *testing.T) {
+	s, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	statusMsg := types.MessageItem{
+		ID:         "status-123",
+		Chat:       "status@broadcast",
+		Sender:     "contact@s.whatsapp.net",
+		SenderName: "Friend",
+		Timestamp:  time.Now(),
+		Text:       "My Status Story",
+		Status:     "received",
+	}
+
+	if err := s.SaveMessage(ctx, statusMsg); err != nil {
+		t.Fatalf("SaveMessage for status failed: %v", err)
+	}
+
+	msgs, err := s.GetMessages(ctx, "status@broadcast", 10, "")
+	if err != nil {
+		t.Fatalf("GetMessages for status failed: %v", err)
+	}
+
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 status message, got %d", len(msgs))
+	}
+	if msgs[0].Text != "My Status Story" {
+		t.Errorf("unexpected status text: %s", msgs[0].Text)
+	}
+}

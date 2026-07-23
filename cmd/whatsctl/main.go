@@ -251,6 +251,93 @@ func main() {
 		}
 		handleChatState(cfg.SocketPath, *chat, *action, *duration)
 
+	case "post-status":
+		postStatusFlags := flag.NewFlagSet("post-status", flag.ExitOnError)
+		text := postStatusFlags.String("text", "", "Status update text")
+		filePath := postStatusFlags.String("file", "", "Local media file path")
+		mediaType := postStatusFlags.String("type", "", "Media type (image|video)")
+		caption := postStatusFlags.String("caption", "", "Optional caption")
+		_ = postStatusFlags.Parse(os.Args[2:])
+
+		if *text == "" && *filePath == "" {
+			fmt.Println("Error: must specify either --text or --file")
+			postStatusFlags.Usage()
+			os.Exit(1)
+		}
+		handlePostStatus(cfg.SocketPath, *text, *filePath, *mediaType, *caption)
+
+	case "statuses":
+		statusesFlags := flag.NewFlagSet("statuses", flag.ExitOnError)
+		limit := statusesFlags.Int("limit", 50, "Limit number of status updates")
+		_ = statusesFlags.Parse(os.Args[2:])
+		handleGetStatuses(cfg.SocketPath, *limit)
+
+	case "newsletters":
+		handleGetNewsletters(cfg.SocketPath)
+
+	case "follow-newsletter":
+		followFlags := flag.NewFlagSet("follow-newsletter", flag.ExitOnError)
+		jid := followFlags.String("jid", "", "Newsletter / Channel JID")
+		unfollow := followFlags.Bool("unfollow", false, "Unfollow channel instead of follow")
+		_ = followFlags.Parse(os.Args[2:])
+
+		if *jid == "" {
+			fmt.Println("Error: --jid is required")
+			followFlags.Usage()
+			os.Exit(1)
+		}
+		handleFollowNewsletter(cfg.SocketPath, *jid, *unfollow)
+
+	case "newsletter-messages":
+		msgsFlags := flag.NewFlagSet("newsletter-messages", flag.ExitOnError)
+		jid := msgsFlags.String("jid", "", "Newsletter / Channel JID")
+		limit := msgsFlags.Int("limit", 50, "Maximum posts to fetch")
+		beforeID := msgsFlags.Int64("before", 0, "Server message ID for pagination")
+		_ = msgsFlags.Parse(os.Args[2:])
+
+		if *jid == "" {
+			fmt.Println("Error: --jid is required")
+			msgsFlags.Usage()
+			os.Exit(1)
+		}
+		handleGetNewsletterMessages(cfg.SocketPath, *jid, *limit, *beforeID)
+
+	case "blocklist":
+		handleGetBlocklist(cfg.SocketPath)
+
+	case "block":
+		blockFlags := flag.NewFlagSet("block", flag.ExitOnError)
+		jid := blockFlags.String("jid", "", "Contact JID or phone number")
+		unblock := blockFlags.Bool("unblock", false, "Unblock contact")
+		_ = blockFlags.Parse(os.Args[2:])
+
+		if *jid == "" {
+			fmt.Println("Error: --jid is required")
+			blockFlags.Usage()
+			os.Exit(1)
+		}
+		action := "block"
+		if *unblock {
+			action = "unblock"
+		}
+		handleBlockContact(cfg.SocketPath, *jid, action)
+
+	case "privacy":
+		handleGetPrivacySettings(cfg.SocketPath)
+
+	case "set-privacy":
+		setPrivacyFlags := flag.NewFlagSet("set-privacy", flag.ExitOnError)
+		setting := setPrivacyFlags.String("setting", "", "Setting name (group_add|last_seen|status|profile_photo|read_receipts|online)")
+		value := setPrivacyFlags.String("value", "", "Setting value (all|contacts|contact_blacklist|none|match_last_seen)")
+		_ = setPrivacyFlags.Parse(os.Args[2:])
+
+		if *setting == "" || *value == "" {
+			fmt.Println("Error: --setting and --value are required")
+			setPrivacyFlags.Usage()
+			os.Exit(1)
+		}
+		handleSetPrivacySetting(cfg.SocketPath, *setting, *value)
+
 	case "listen":
 		handleListen(cfg.SocketPath)
 
@@ -284,6 +371,15 @@ func printUsage() {
 	fmt.Println("  group-info --jid <jid> Get group metadata and member list")
 	fmt.Println("  create-group --title <title> [--participants <jids>] Create new group chat")
 	fmt.Println("  group-members --jid <jid> --action <add|remove|promote|demote> --participants <jids> Manage group members")
+	fmt.Println("  post-status [--text msg] [--file path] Post text or media status update")
+	fmt.Println("  statuses [--limit N]  Query recent status / story updates")
+	fmt.Println("  newsletters           List followed channels / newsletters")
+	fmt.Println("  follow-newsletter --jid <jid> [--unfollow] Follow/unfollow channel")
+	fmt.Println("  newsletter-messages --jid <jid> [--limit N] Query channel posts")
+	fmt.Println("  blocklist             List blocked contacts")
+	fmt.Println("  block --jid <jid> [--unblock] Block or unblock a contact")
+	fmt.Println("  privacy               View current privacy settings")
+	fmt.Println("  set-privacy --setting <setting> --value <value> Set privacy configuration")
 	fmt.Println("  history --chat <jid>  Query message history for a chat")
 	fmt.Println("  mark-read --chat <jid> [--ids <id1,id2>] Reset unread count and mark messages read")
 	fmt.Println("  download --id <msg_id> [--chat <jid>] Download media for a message")

@@ -192,3 +192,59 @@ type ProfilePictureResult struct {
 	ID       string `json:"id,omitempty"`
 	FilePath string `json:"file_path,omitempty"`
 }
+
+// PostStatusParams holds arguments for posting a text or media status update.
+type PostStatusParams struct {
+	Text      string `json:"text,omitempty"`
+	FilePath  string `json:"file_path,omitempty"`
+	MediaType string `json:"media_type,omitempty"`
+	Caption   string `json:"caption,omitempty"`
+}
+
+// StatusItem represents a posted or received WhatsApp status / story update.
+type StatusItem struct {
+	ID        string    `json:"id"`
+	Sender    string    `json:"sender"`
+	PushName  string    `json:"push_name,omitempty"`
+	Text      string    `json:"text,omitempty"`
+	MediaType string    `json:"media_type,omitempty"`
+	MediaPath string    `json:"media_path,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// NewsletterItem represents metadata for a subscribed WhatsApp channel / newsletter.
+type NewsletterItem struct {
+	JID              string    `json:"jid"`
+	Name             string    `json:"name"`
+	Description      string    `json:"description,omitempty"`
+	SubscribersCount int       `json:"subscribers_count"`
+	State            string    `json:"state,omitempty"`
+	Role             string    `json:"role,omitempty"`
+	Muted            bool      `json:"muted"`
+	CreatedAt        time.Time `json:"created_at,omitempty"`
+}
+
+// NewsletterMessageItem represents a message posted in a channel.
+type NewsletterMessageItem struct {
+	ID        string    `json:"id"`
+	ServerID  int64     `json:"server_id"`
+	Views     int       `json:"views"`
+	Text      string    `json:"text"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// BlocklistResult contains the list of blocked contact JIDs.
+type BlocklistResult struct {
+	JIDs []string `json:"jids"`
+}
+
+// PrivacySettingsResult contains the user's current privacy configuration options.
+type PrivacySettingsResult struct {
+	GroupAdd     string `json:"group_add"`
+	LastSeen     string `json:"last_seen"`
+	Status       string `json:"status"`
+	Profile      string `json:"profile"`
+	ReadReceipts string `json:"read_receipts"`
+	Online       string `json:"online"`
+	CallAdd      string `json:"call_add"`
+}
