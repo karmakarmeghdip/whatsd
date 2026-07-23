@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/mdp/qrterminal/v3"
 
@@ -26,7 +27,7 @@ func handleStatus(socketPath string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{ID: "1", Method: "status"}
 	sendReq(conn, req)
@@ -47,7 +48,7 @@ func handlePairQR(socketPath string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	fmt.Println("Requesting QR pairing mode...")
 	req := types.Request{ID: "1", Method: "pair_qr"}
@@ -92,7 +93,7 @@ func handlePairPhone(socketPath string, phone string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{
 		ID:     "1",
@@ -115,18 +116,22 @@ func handlePairPhone(socketPath string, phone string) {
 	fmt.Println("Enter this code in WhatsApp -> Linked Devices -> Link with Phone Number.")
 }
 
-func handleSend(socketPath string, to string, text string) {
+func handleSend(socketPath string, to string, text string, replyToID string) {
 	conn, err := connectSocket(socketPath)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{
 		ID:     "1",
 		Method: "send_message",
-		Params: map[string]any{"to": to, "text": text},
+		Params: map[string]any{
+			"to":          to,
+			"text":        text,
+			"reply_to_id": replyToID,
+		},
 	}
 	sendReq(conn, req)
 
@@ -147,7 +152,7 @@ func handleSendMedia(socketPath string, to string, mediaType string, filePath st
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{
 		ID:     "1",
@@ -173,13 +178,131 @@ func handleSendMedia(socketPath string, to string, mediaType string, filePath st
 	fmt.Println(string(dataBytes))
 }
 
+func handleContacts(socketPath string, query string) {
+	conn, err := connectSocket(socketPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	defer func() { _ = conn.Close() }()
+
+	req := types.Request{
+		ID:     "1",
+		Method: "get_contacts",
+		Params: map[string]any{"query": query},
+	}
+	sendReq(conn, req)
+
+	resp := readResp(conn)
+	if resp.Error != "" {
+		fmt.Printf("GetContacts Error: %s\n", resp.Error)
+		os.Exit(1)
+	}
+
+	dataBytes, _ := json.MarshalIndent(resp.Result, "", "  ")
+	fmt.Println("Contacts:")
+	fmt.Println(string(dataBytes))
+}
+
+func handleEdit(socketPath string, chat string, id string, newText string) {
+	conn, err := connectSocket(socketPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	defer func() { _ = conn.Close() }()
+
+	req := types.Request{
+		ID:     "1",
+		Method: "edit_message",
+		Params: map[string]any{"chat": chat, "message_id": id, "new_text": newText},
+	}
+	sendReq(conn, req)
+
+	resp := readResp(conn)
+	if resp.Error != "" {
+		fmt.Printf("Edit Error: %s\n", resp.Error)
+		os.Exit(1)
+	}
+	fmt.Println("Message edited successfully.")
+}
+
+func handleRevoke(socketPath string, chat string, id string) {
+	conn, err := connectSocket(socketPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	defer func() { _ = conn.Close() }()
+
+	req := types.Request{
+		ID:     "1",
+		Method: "revoke_message",
+		Params: map[string]any{"chat": chat, "message_id": id},
+	}
+	sendReq(conn, req)
+
+	resp := readResp(conn)
+	if resp.Error != "" {
+		fmt.Printf("Revoke Error: %s\n", resp.Error)
+		os.Exit(1)
+	}
+	fmt.Println("Message revoked successfully.")
+}
+
+func handleSendPresence(socketPath string, chat string, state string) {
+	conn, err := connectSocket(socketPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	defer func() { _ = conn.Close() }()
+
+	req := types.Request{
+		ID:     "1",
+		Method: "send_presence",
+		Params: map[string]any{"chat": chat, "state": state},
+	}
+	sendReq(conn, req)
+
+	resp := readResp(conn)
+	if resp.Error != "" {
+		fmt.Printf("SendPresence Error: %s\n", resp.Error)
+		os.Exit(1)
+	}
+	fmt.Println("Presence sent successfully.")
+}
+
+func handleReact(socketPath string, chat string, id string, emoji string) {
+	conn, err := connectSocket(socketPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	defer func() { _ = conn.Close() }()
+
+	req := types.Request{
+		ID:     "1",
+		Method: "react_message",
+		Params: map[string]any{"chat": chat, "message_id": id, "emoji": emoji},
+	}
+	sendReq(conn, req)
+
+	resp := readResp(conn)
+	if resp.Error != "" {
+		fmt.Printf("React Error: %s\n", resp.Error)
+		os.Exit(1)
+	}
+	fmt.Println("Reaction sent successfully.")
+}
+
 func handleChats(socketPath string, limit int) {
 	conn, err := connectSocket(socketPath)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{
 		ID:     "1",
@@ -231,7 +354,7 @@ func handleHistory(socketPath string, chat string, limit int, beforeID string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	params := map[string]any{"chat": chat, "limit": limit}
 	if beforeID != "" {
@@ -276,18 +399,31 @@ func handleHistory(socketPath string, chat string, limit int, beforeID string) {
 	}
 }
 
-func handleMarkRead(socketPath string, chat string) {
+func handleMarkRead(socketPath string, chat string, ids string) {
 	conn, err := connectSocket(socketPath)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
+
+	var msgIDs []string
+	if ids != "" {
+		parts := strings.Split(ids, ",")
+		for _, p := range parts {
+			if p = strings.TrimSpace(p); p != "" {
+				msgIDs = append(msgIDs, p)
+			}
+		}
+	}
 
 	req := types.Request{
 		ID:     "1",
 		Method: "mark_read",
-		Params: map[string]any{"chat": chat},
+		Params: map[string]any{
+			"chat":        chat,
+			"message_ids": msgIDs,
+		},
 	}
 	sendReq(conn, req)
 
@@ -306,7 +442,7 @@ func handleDownload(socketPath string, id string, chat string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{
 		ID:     "1",
@@ -332,7 +468,7 @@ func handleListen(socketPath string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	fmt.Println("Listening for WhatsApp daemon events (Press Ctrl+C to exit)...")
 	scanner := bufio.NewScanner(conn)
@@ -364,7 +500,7 @@ func handleLogout(socketPath string) {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	req := types.Request{ID: "1", Method: "logout"}
 	sendReq(conn, req)
@@ -385,10 +521,15 @@ func sendReq(conn net.Conn, req types.Request) {
 
 func readResp(conn net.Conn) types.Response {
 	scanner := bufio.NewScanner(conn)
+	buf := make([]byte, 64*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 	if scanner.Scan() {
 		var resp types.Response
 		_ = json.Unmarshal(scanner.Bytes(), &resp)
 		return resp
+	}
+	if err := scanner.Err(); err != nil {
+		return types.Response{Error: fmt.Sprintf("read error: %v", err)}
 	}
 	return types.Response{Error: "no response from daemon"}
 }

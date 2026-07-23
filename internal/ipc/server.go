@@ -138,6 +138,8 @@ func (s *Server) unregisterClient(conn net.Conn) {
 func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	defer s.unregisterClient(conn)
 	scanner := bufio.NewScanner(conn)
+	buf := make([]byte, 64*1024)
+	scanner.Buffer(buf, 10*1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -206,11 +208,13 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 	case "send_message":
 		to, _ := req.Params["to"].(string)
 		text, _ := req.Params["text"].(string)
+		replyToID, _ := req.Params["reply_to_id"].(string)
+
 		if to == "" || text == "" {
 			s.sendError(conn, req.ID, "missing required params 'to' or 'text'")
 			return
 		}
-		id, ts, err := s.waClient.SendMessage(ctx, to, text)
+		id, ts, err := s.waClient.SendMessage(ctx, to, text, replyToID)
 		if err != nil {
 			s.sendError(conn, req.ID, err.Error())
 		} else {
@@ -241,6 +245,68 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 			})
 		}
 
+	case "edit_message":
+		chat, _ := req.Params["chat"].(string)
+		id, _ := req.Params["message_id"].(string)
+		newText, _ := req.Params["new_text"].(string)
+
+		if chat == "" || id == "" || newText == "" {
+			s.sendError(conn, req.ID, "missing required params 'chat', 'message_id', or 'new_text'")
+			return
+		}
+		err := s.waClient.EditMessage(ctx, chat, id, newText)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
+	case "revoke_message":
+		chat, _ := req.Params["chat"].(string)
+		id, _ := req.Params["message_id"].(string)
+
+		if chat == "" || id == "" {
+			s.sendError(conn, req.ID, "missing required params 'chat' or 'message_id'")
+			return
+		}
+		err := s.waClient.RevokeMessage(ctx, chat, id)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
+	case "send_presence":
+		chat, _ := req.Params["chat"].(string)
+		state, _ := req.Params["state"].(string)
+
+		if chat == "" || state == "" {
+			s.sendError(conn, req.ID, "missing required params 'chat' or 'state'")
+			return
+		}
+		err := s.waClient.SendPresence(ctx, chat, state)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
+	case "react_message":
+		chat, _ := req.Params["chat"].(string)
+		id, _ := req.Params["message_id"].(string)
+		emoji, _ := req.Params["emoji"].(string)
+
+		if chat == "" || id == "" || emoji == "" {
+			s.sendError(conn, req.ID, "missing required params 'chat', 'message_id', or 'emoji'")
+			return
+		}
+		err := s.waClient.ReactMessage(ctx, chat, id, emoji)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, map[string]string{"status": "ok"})
+		}
+
 	case "logout":
 		err := s.waClient.Logout(ctx)
 		if err != nil {
@@ -256,6 +322,15 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 			s.sendError(conn, req.ID, err.Error())
 		} else {
 			s.sendResult(conn, req.ID, chats)
+		}
+
+	case "get_contacts":
+		query, _ := req.Params["query"].(string)
+		contacts, err := s.waClient.GetContacts(ctx, query)
+		if err != nil {
+			s.sendError(conn, req.ID, err.Error())
+		} else {
+			s.sendResult(conn, req.ID, contacts)
 		}
 
 	case "get_messages":
@@ -275,11 +350,18 @@ func (s *Server) handleRequest(ctx context.Context, conn net.Conn, req types.Req
 
 	case "mark_read":
 		chat, _ := req.Params["chat"].(string)
+		idsRaw, _ := req.Params["message_ids"].([]any)
 		if chat == "" {
 			s.sendError(conn, req.ID, "missing required param 'chat'")
 			return
 		}
-		err := s.waClient.MarkRead(ctx, chat)
+		var msgIDs []string
+		for _, id := range idsRaw {
+			if idStr, ok := id.(string); ok {
+				msgIDs = append(msgIDs, idStr)
+			}
+		}
+		err := s.waClient.MarkRead(ctx, chat, msgIDs)
 		if err != nil {
 			s.sendError(conn, req.ID, err.Error())
 		} else {

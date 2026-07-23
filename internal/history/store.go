@@ -192,7 +192,7 @@ func (s *Store) GetChats(ctx context.Context, limit int) ([]types.ChatItem, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to query chats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var chats []types.ChatItem
 	for rows.Next() {
@@ -261,7 +261,7 @@ func (s *Store) GetMessages(ctx context.Context, chatJID string, limit int, befo
 	if err != nil {
 		return nil, fmt.Errorf("failed to query messages: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var msgs []types.MessageItem
 	for rows.Next() {
@@ -327,4 +327,54 @@ func (s *Store) UpdateMediaPath(ctx context.Context, messageID string, mediaPath
 		return fmt.Errorf("failed to update media path: %w", err)
 	}
 	return nil
+}
+
+// UpdateMessageText updates a message's text and marks it as edited.
+func (s *Store) UpdateMessageText(ctx context.Context, messageID string, newText string, isEdited bool) error {
+	isEditedInt := 0
+	if isEdited {
+		isEditedInt = 1
+	}
+	_, err := s.db.ExecContext(ctx, "UPDATE whatsd_messages SET text = ?, is_edited = ? WHERE id = ?", newText, isEditedInt, messageID)
+	if err != nil {
+		return fmt.Errorf("failed to update message text: %w", err)
+	}
+	return nil
+}
+
+// MarkRevoked marks a message as revoked.
+func (s *Store) MarkRevoked(ctx context.Context, messageID string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE whatsd_messages SET is_revoked = 1, text = '' WHERE id = ?", messageID)
+	if err != nil {
+		return fmt.Errorf("failed to mark message revoked: %w", err)
+	}
+	return nil
+}
+
+// GetMessageSender returns the sender JID for a given message ID.
+func (s *Store) GetMessageSender(ctx context.Context, messageID string) (string, error) {
+	var sender string
+	err := s.db.QueryRowContext(ctx, "SELECT sender_jid FROM whatsd_messages WHERE id = ?", messageID).Scan(&sender)
+	return sender, err
+}
+
+// GetContactsFromChats fetches contacts recorded from chat history.
+func (s *Store) GetContactsFromChats(ctx context.Context) ([]types.ContactItem, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT jid, name FROM whatsd_chats WHERE name != ''")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []types.ContactItem
+	for rows.Next() {
+		var jid, name string
+		if err := rows.Scan(&jid, &name); err == nil {
+			items = append(items, types.ContactItem{
+				JID:      jid,
+				FullName: name,
+			})
+		}
+	}
+	return items, nil
 }

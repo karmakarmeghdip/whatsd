@@ -23,8 +23,8 @@ The repository is early-stage. It has the whatsmeow dependency cloned in referen
 ## Go Guidelines
 
 1. Target Go 1.22 or higher.
-2. Run `go fmt ./...` (or `goimports`) after Go edits.
-3. Run `go vet ./...` and `golangci-lint run ./...` after implementation, then fix errors and warnings in a loop until the codebase is clean.
+2. Run `make fmt` after Go edits.
+3. Run `make lint` and `make test` after implementation, then fix errors and warnings in a loop until the codebase is clean.
 4. Use standard error wrapping (`fmt.Errorf("...: %w", err)`) and standard `errors.Is` / `errors.As` checks. Avoid naked error returns or unhandled errors.
 5. Use standard library `log/slog` for structured daemon logging.
 6. Keep IPC request/response structs and shared application DTOs under `internal/types/`.
@@ -33,9 +33,9 @@ The repository is early-stage. It has the whatsmeow dependency cloned in referen
 
 ## AI-Assisted Go Workflow
 
-1. Prefer small, idiomatic changes that preserve compilation (`go build ./...`) at each step.
-2. After implementing behavior, run `go fmt ./...`, `go vet ./...`, and `golangci-lint run ./...`.
-3. If `go vet` or `golangci-lint` reports errors or warnings, fix them and rerun the check commands in a loop until clean.
+1. Prefer small, idiomatic changes that preserve compilation (`make build`) at each step.
+2. After implementing behavior, run `make fmt`, `make lint`, and `make test`.
+3. If `make lint` or `make test` reports errors or warnings, fix them and rerun the Makefile targets in a loop until clean.
 4. Propagate critical errors upward with explicit error wrapping via `fmt.Errorf("context message: %w", err)`.
 5. Handle non-critical local errors internally with explicit control flow and `slog.Warn(...)` or `slog.Error(...)` instead of panicking.
 6. Do not use `panic()` or `log.Fatal()` inside runtime daemon paths, IPC connection loops, or event handlers.

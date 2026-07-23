@@ -20,7 +20,7 @@ Tasks are strictly prioritized: **Phase 1** establishes durable local message st
   - **whatsmeow API**: Handle `*events.HistorySync` events from `whatsmeow` and ingest initial message/chat batches into local SQLite store.
   - **Verification**: Pair daemon via QR, verify incoming `history_sync_progress` events, and confirm historical chats and past messages are populated in `whatsctl chats` and `whatsctl history`.
 
-- [ ] **3. Message Editing & Revocation (Delete for Everyone / Delete for Me)**
+- [x] **3. Message Editing & Revocation (Delete for Everyone / Delete for Me)**
   - **Goal**: Support editing sent text messages and revoking/deleting messages locally and on remote devices.
   - **IPC Protocol**: Add `edit_message` method (params: `chat` JID, `message_id`, `new_text`). Add `revoke_message` method (params: `chat` JID, `message_id`). Broadcast `message_edit` and `message_revoke` push events.
   - **whatsmeow API**: Use `cli.BuildEdit(chatJID, msgID, newTextMsg)` and `cli.BuildRevoke(chatJID, senderJID, msgID)`.
@@ -42,19 +42,19 @@ Tasks are strictly prioritized: **Phase 1** establishes durable local message st
   - **whatsmeow API**: Upload file using `cli.Upload(...)`, construct appropriate `*waE2E.ImageMessage` / `*waE2E.DocumentMessage` etc., and dispatch with `cli.SendMessage(...)`.
   - **Verification**: `whatsctl send-media --to <jid> --file /path/to/img.png --caption "Test image"` sends the media successfully.
 
-- [ ] **6. Read Receipts & Delivery Receipts**
+- [x] **6. Read Receipts & Delivery Receipts**
   - **Goal**: Send read receipts when a client views a chat, and emit receipt events (`delivered`, `read`, `played`) when sent messages are read by recipients.
   - **IPC Protocol**: Add IPC method `mark_read` (params: `chat` JID, `message_ids` array). Add `receipt` push event notification containing `message_id`, `chat`, `sender`, `type` (`read`|`delivered`|`played`), and `timestamp`.
   - **whatsmeow API**: Use `cli.MarkRead(...)` and listen for `*events.Receipt`.
   - **Verification**: Call `whatsctl mark-read --chat <jid> --ids <msg_id>`, observe blue ticks on sender's WhatsApp app; send a message from `whatsctl send` and observe `receipt` event in `whatsctl listen` when recipient opens it.
 
-- [ ] **7. Typing & Presence Indicators**
+- [x] **7. Typing & Presence Indicators**
   - **Goal**: Send presence updates ("composing", "recording", "paused") and emit incoming presence events from contacts.
   - **IPC Protocol**: Add `send_presence` method (params: `chat` JID, `state` (`composing`|`recording`|`paused`)). Broadcast `presence` event (data: `sender` JID, `state`, `last_seen`).
   - **whatsmeow API**: `cli.SendChatPresence(chatJID, waTypes.PresenceComposing, waTypes.ChatPresenceMediaText)` and listen for `*events.Presence`.
   - **Verification**: `whatsctl presence --chat <jid> --state composing` shows "typing..." on phone; typing on phone emits presence event in `whatsctl listen`.
 
-- [ ] **8. Message Quoting / Replies & Emoji Reactions**
+- [x] **8. Message Quoting / Replies & Emoji Reactions**
   - **Goal**: Support replying to specific messages and sending/receiving emoji reactions.
   - **IPC Protocol**: Extend `send_message` with `reply_to_id` parameter. Add IPC method `react_message` (params: `chat` JID, `message_id`, `emoji` string). Broadcast `reaction` event (data: `message_id`, `sender`, `emoji`).
   - **whatsmeow API**: Construct `waE2E.ContextInfo` with `StanzaID` & `Participant` for replies; use `cli.SendMessage` with `waE2E.ReactionMessage` for reactions. Listen for `*events.Message` containing `ReactionMessage`.
@@ -116,3 +116,20 @@ Tasks are strictly prioritized: **Phase 1** establishes durable local message st
   - **IPC Protocol**: Add status field `queued` for `send_message` when offline, emit `message_delivered_from_outbox` event when flushed.
   - **Storage Architecture**: Add `outbox` table in `internal/store` to track pending message payloads and retry attempts.
   - **Verification**: Disconnect internet, run `whatsctl send`, reconnect internet, verify message is delivered automatically.
+
+- [ ] **16. Full-Text Message Search (SQLite FTS5)**
+  - **Goal**: Enable instantaneous, fast full-text searching across all historical messages in local SQLite database.
+  - **IPC Protocol**: Add `search_messages` method (params: `query` string, `chat` optional JID, `limit` int -> returns matching messages with snippets).
+
+- [x] **17. Contact Book & User Directory Sync**
+  - **Goal**: Persist contact phone numbers, display names, and push names in local SQLite storage for contact search and UI auto-completion.
+  - **IPC Protocol**: Add `get_contacts` method (params: `query` optional string -> returns contact list with JIDs, push names, custom names).
+
+- [ ] **18. Incoming Call Event Signaling (Audio/Video Calls)**
+  - **Goal**: Notify IPC clients when an incoming audio or video call offer is received.
+  - **IPC Protocol**: Broadcast `call_offer` and `call_terminate` events (data: `call_id`, `caller` JID, `is_video`, `timestamp`).
+
+- [ ] **19. Group Invite Links & Join via Link**
+  - **Goal**: Generate shareable group invite links and allow joining groups using an invite link/code.
+  - **IPC Protocol**: Add `get_group_invite` (params: `group_jid` -> returns invite URL) and `join_group` (params: `code` string -> returns `group_jid`).
+

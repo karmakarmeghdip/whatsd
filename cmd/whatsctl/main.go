@@ -40,15 +40,16 @@ func main() {
 	case "send":
 		sendFlags := flag.NewFlagSet("send", flag.ExitOnError)
 		to := sendFlags.String("to", "", "Recipient phone number or JID")
-		text := sendFlags.String("text", "", "Message text to send")
+		text := sendFlags.String("text", "", "Message text")
+		replyToID := sendFlags.String("reply", "", "Message ID to reply to")
 		_ = sendFlags.Parse(os.Args[2:])
 
 		if *to == "" || *text == "" {
-			fmt.Println("Error: both --to and --text are required")
+			fmt.Println("Error: --to and --text are required")
 			sendFlags.Usage()
 			os.Exit(1)
 		}
-		handleSend(cfg.SocketPath, *to, *text)
+		handleSend(cfg.SocketPath, *to, *text, *replyToID)
 
 	case "send-media":
 		sendMediaFlags := flag.NewFlagSet("send-media", flag.ExitOnError)
@@ -66,11 +67,71 @@ func main() {
 		}
 		handleSendMedia(cfg.SocketPath, *to, *mediaType, *filePath, *caption, *fileName)
 
+	case "edit":
+		editFlags := flag.NewFlagSet("edit", flag.ExitOnError)
+		chat := editFlags.String("chat", "", "Chat JID")
+		id := editFlags.String("id", "", "Message ID to edit")
+		text := editFlags.String("text", "", "New message text")
+		_ = editFlags.Parse(os.Args[2:])
+
+		if *chat == "" || *id == "" || *text == "" {
+			fmt.Println("Error: --chat, --id, and --text are required")
+			editFlags.Usage()
+			os.Exit(1)
+		}
+		handleEdit(cfg.SocketPath, *chat, *id, *text)
+
+	case "revoke":
+		revokeFlags := flag.NewFlagSet("revoke", flag.ExitOnError)
+		chat := revokeFlags.String("chat", "", "Chat JID")
+		id := revokeFlags.String("id", "", "Message ID to revoke")
+		_ = revokeFlags.Parse(os.Args[2:])
+
+		if *chat == "" || *id == "" {
+			fmt.Println("Error: --chat and --id are required")
+			revokeFlags.Usage()
+			os.Exit(1)
+		}
+		handleRevoke(cfg.SocketPath, *chat, *id)
+
+	case "presence":
+		presenceFlags := flag.NewFlagSet("presence", flag.ExitOnError)
+		chat := presenceFlags.String("chat", "", "Chat JID")
+		state := presenceFlags.String("state", "", "Presence state (composing|recording|paused)")
+		_ = presenceFlags.Parse(os.Args[2:])
+
+		if *chat == "" || *state == "" {
+			fmt.Println("Error: --chat and --state are required")
+			presenceFlags.Usage()
+			os.Exit(1)
+		}
+		handleSendPresence(cfg.SocketPath, *chat, *state)
+
+	case "react":
+		reactFlags := flag.NewFlagSet("react", flag.ExitOnError)
+		chat := reactFlags.String("chat", "", "Chat JID")
+		id := reactFlags.String("id", "", "Message ID to react to")
+		emoji := reactFlags.String("emoji", "", "Emoji string")
+		_ = reactFlags.Parse(os.Args[2:])
+
+		if *chat == "" || *id == "" || *emoji == "" {
+			fmt.Println("Error: --chat, --id, and --emoji are required")
+			reactFlags.Usage()
+			os.Exit(1)
+		}
+		handleReact(cfg.SocketPath, *chat, *id, *emoji)
+
 	case "chats":
 		chatsFlags := flag.NewFlagSet("chats", flag.ExitOnError)
 		limit := chatsFlags.Int("limit", 50, "Maximum number of chats to return")
 		_ = chatsFlags.Parse(os.Args[2:])
 		handleChats(cfg.SocketPath, *limit)
+
+	case "contacts":
+		contactsFlags := flag.NewFlagSet("contacts", flag.ExitOnError)
+		query := contactsFlags.String("query", "", "Search query for name, push name, or JID")
+		_ = contactsFlags.Parse(os.Args[2:])
+		handleContacts(cfg.SocketPath, *query)
 
 	case "history":
 		historyFlags := flag.NewFlagSet("history", flag.ExitOnError)
@@ -88,15 +149,16 @@ func main() {
 
 	case "mark-read":
 		markReadFlags := flag.NewFlagSet("mark-read", flag.ExitOnError)
-		chat := markReadFlags.String("chat", "", "Chat JID or phone number to mark as read")
+		chat := markReadFlags.String("chat", "", "Chat JID to mark as read")
+		ids := markReadFlags.String("ids", "", "Comma-separated list of message IDs to send read receipt for")
 		_ = markReadFlags.Parse(os.Args[2:])
 
 		if *chat == "" {
-			fmt.Println("Error: --chat JID is required")
+			fmt.Println("Error: --chat is required")
 			markReadFlags.Usage()
 			os.Exit(1)
 		}
-		handleMarkRead(cfg.SocketPath, *chat)
+		handleMarkRead(cfg.SocketPath, *chat, *ids)
 
 	case "download":
 		downloadFlags := flag.NewFlagSet("download", flag.ExitOnError)
@@ -130,11 +192,16 @@ func printUsage() {
 	fmt.Println("  status                Check daemon connection and identity status")
 	fmt.Println("  pair --qr             Start QR code pairing (renders QR in terminal)")
 	fmt.Println("  pair --phone <num>    Start phone pairing code generation")
-	fmt.Println("  send --to <jid> --text <msg> Send a text message")
+	fmt.Println("  send --to <jid> --text <msg> [--reply <id>] Send a text message")
 	fmt.Println("  send-media --to <jid> --type <type> --file <path> Send media message")
+	fmt.Println("  edit --chat <jid> --id <msg_id> --text <new_text> Edit a message")
+	fmt.Println("  revoke --chat <jid> --id <msg_id> Revoke a message")
+	fmt.Println("  react --chat <jid> --id <msg_id> --emoji <emoji> React to a message")
+	fmt.Println("  presence --chat <jid> --state <state> Send presence state")
 	fmt.Println("  chats [--limit N]     List active chats with last message preview and unread count")
+	fmt.Println("  contacts [--query Q]  Search contacts directory by name, push name, or JID")
 	fmt.Println("  history --chat <jid>  Query message history for a chat")
-	fmt.Println("  mark-read --chat <jid> Reset unread count and mark messages read")
+	fmt.Println("  mark-read --chat <jid> [--ids <id1,id2>] Reset unread count and mark messages read")
 	fmt.Println("  download --id <msg_id> [--chat <jid>] Download media for a message")
 	fmt.Println("  listen                Listen for incoming messages and daemon events")
 	fmt.Println("  logout                Logout current session")

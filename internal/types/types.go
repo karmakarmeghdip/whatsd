@@ -55,6 +55,15 @@ type SendMediaParams struct {
 	FileName  string `json:"file_name,omitempty"`
 }
 
+// ContactItem represents a contact directory entry.
+type ContactItem struct {
+	JID          string `json:"jid"`
+	FirstName    string `json:"first_name,omitempty"`
+	FullName     string `json:"full_name,omitempty"`
+	PushName     string `json:"push_name,omitempty"`
+	BusinessName string `json:"business_name,omitempty"`
+}
+
 // EventNotification represents an asynchronous push notification sent to IPC clients.
 type EventNotification struct {
 	Event string `json:"event"`

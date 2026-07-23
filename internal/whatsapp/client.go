@@ -125,11 +125,12 @@ func (c *Client) PairQR(ctx context.Context, qrCallback func(evt string, code st
 
 	go func() {
 		for item := range qrChan {
-			if item.Event == whatsmeow.QRChannelEventCode {
+			switch item.Event {
+			case whatsmeow.QRChannelEventCode:
 				qrCallback("code", item.Code, nil)
-			} else if item.Event == whatsmeow.QRChannelEventError {
+			case whatsmeow.QRChannelEventError:
 				qrCallback("error", "", item.Error)
-			} else if item.Event == "success" {
+			case "success":
 				slog.Info("QR pairing completed successfully")
 				qrCallback("success", "", nil)
 			}
@@ -165,7 +166,7 @@ func (c *Client) PairPhone(ctx context.Context, phone string) (string, error) {
 }
 
 // SendMessage sends a text message to the given target JID.
-func (c *Client) SendMessage(ctx context.Context, toJID string, text string) (string, time.Time, error) {
+func (c *Client) SendMessage(ctx context.Context, toJID string, text string, replyToID string) (string, time.Time, error) {
 	if text == "" {
 		return "", time.Time{}, fmt.Errorf("message text cannot be empty")
 	}
@@ -180,6 +181,21 @@ func (c *Client) SendMessage(ctx context.Context, toJID string, text string) (st
 
 	msg := &waE2E.Message{
 		Conversation: proto.String(text),
+	}
+
+	if replyToID != "" && c.historyStore != nil {
+		senderStr, err := c.historyStore.GetMessageSender(ctx, replyToID)
+		if err == nil && senderStr != "" {
+			msg = &waE2E.Message{
+				ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+					Text: proto.String(text),
+					ContextInfo: &waE2E.ContextInfo{
+						StanzaID:    proto.String(replyToID),
+						Participant: proto.String(senderStr),
+					},
+				},
+			}
+		}
 	}
 
 	resp, err := c.waClient.SendMessage(ctx, recipient, msg)
@@ -334,6 +350,177 @@ func (c *Client) SendMedia(ctx context.Context, toJID string, mediaType string, 
 	return sendResp.ID, sendResp.Timestamp, nil
 }
 
+// EditMessage edits a previously sent text message.
+func (c *Client) EditMessage(ctx context.Context, chatJID string, msgID string, newText string) error {
+	recipient, err := waTypes.ParseJID(chatJID)
+	if err != nil {
+		recipient, err = waTypes.ParseJID(chatJID + "@s.whatsapp.net")
+		if err != nil {
+			return fmt.Errorf("invalid target JID %q: %w", chatJID, err)
+		}
+	}
+
+	newMsg := &waE2E.Message{
+		Conversation: proto.String(newText),
+	}
+
+	editMsg := c.waClient.BuildEdit(recipient, msgID, newMsg)
+
+	_, err = c.waClient.SendMessage(ctx, recipient, editMsg)
+	if err != nil {
+		return fmt.Errorf("failed to send edit message: %w", err)
+	}
+
+	if c.historyStore != nil {
+		if err := c.historyStore.UpdateMessageText(ctx, msgID, newText, true); err != nil {
+			slog.Error("failed to update edited message in history", "id", msgID, "err", err)
+		}
+	}
+	return nil
+}
+
+// RevokeMessage deletes a message for everyone.
+func (c *Client) RevokeMessage(ctx context.Context, chatJID string, msgID string) error {
+	recipient, err := waTypes.ParseJID(chatJID)
+	if err != nil {
+		recipient, err = waTypes.ParseJID(chatJID + "@s.whatsapp.net")
+		if err != nil {
+			return fmt.Errorf("invalid target JID %q: %w", chatJID, err)
+		}
+	}
+
+	var senderJID waTypes.JID
+	if c.waClient.Store.ID != nil {
+		senderJID = *c.waClient.Store.ID
+	} else {
+		return fmt.Errorf("not logged in")
+	}
+
+	revokeMsg := c.waClient.BuildRevoke(recipient, senderJID, msgID)
+
+	_, err = c.waClient.SendMessage(ctx, recipient, revokeMsg)
+	if err != nil {
+		return fmt.Errorf("failed to send revoke message: %w", err)
+	}
+
+	if c.historyStore != nil {
+		if err := c.historyStore.MarkRevoked(ctx, msgID); err != nil {
+			slog.Error("failed to mark message revoked in history", "id", msgID, "err", err)
+		}
+	}
+	return nil
+}
+
+// ReactMessage sends an emoji reaction to a specific message.
+func (c *Client) ReactMessage(ctx context.Context, chatJID string, msgID string, emoji string) error {
+	recipient, err := waTypes.ParseJID(chatJID)
+	if err != nil {
+		recipient, err = waTypes.ParseJID(chatJID + "@s.whatsapp.net")
+		if err != nil {
+			return fmt.Errorf("invalid target JID %q: %w", chatJID, err)
+		}
+	}
+
+	senderJID := recipient
+	if c.historyStore != nil {
+		senderStr, err := c.historyStore.GetMessageSender(ctx, msgID)
+		if err == nil && senderStr != "" {
+			senderJID, _ = waTypes.ParseJID(senderStr)
+		}
+	}
+
+	msg := c.waClient.BuildReaction(recipient, senderJID, msgID, emoji)
+	_, err = c.waClient.SendMessage(ctx, recipient, msg)
+	return err
+}
+
+// SendPresence sends typing or recording presence to a chat.
+func (c *Client) SendPresence(ctx context.Context, chatJID string, state string) error {
+	recipient, err := waTypes.ParseJID(chatJID)
+	if err != nil {
+		recipient, err = waTypes.ParseJID(chatJID + "@s.whatsapp.net")
+		if err != nil {
+			return fmt.Errorf("invalid target JID %q: %w", chatJID, err)
+		}
+	}
+
+	var waState waTypes.ChatPresence
+	var waMedia = waTypes.ChatPresenceMediaText
+
+	switch state {
+	case "composing":
+		waState = waTypes.ChatPresenceComposing
+	case "recording":
+		waState = waTypes.ChatPresenceComposing
+		waMedia = waTypes.ChatPresenceMediaAudio
+	case "paused":
+		waState = waTypes.ChatPresencePaused
+	default:
+		return fmt.Errorf("invalid presence state: %s", state)
+	}
+
+	return c.waClient.SendChatPresence(ctx, recipient, waState, waMedia)
+}
+
+// GetContacts queries synced device contacts and history chats matching an optional query string.
+func (c *Client) GetContacts(ctx context.Context, query string) ([]types.ContactItem, error) {
+	c.mu.RLock()
+	waClient := c.waClient
+	hStore := c.historyStore
+	c.mu.RUnlock()
+
+	contactMap := make(map[string]types.ContactItem)
+
+	if waClient != nil && waClient.Store != nil && waClient.Store.Contacts != nil {
+		contacts, err := waClient.Store.Contacts.GetAllContacts(ctx)
+		if err == nil {
+			for jid, info := range contacts {
+				contactMap[jid.String()] = types.ContactItem{
+					JID:          jid.String(),
+					FirstName:    info.FirstName,
+					FullName:     info.FullName,
+					PushName:     info.PushName,
+					BusinessName: info.BusinessName,
+				}
+			}
+		}
+	}
+
+	if hStore != nil {
+		chatContacts, err := hStore.GetContactsFromChats(ctx)
+		if err == nil {
+			for _, item := range chatContacts {
+				if existing, found := contactMap[item.JID]; found {
+					if existing.FullName == "" {
+						existing.FullName = item.FullName
+						contactMap[item.JID] = existing
+					}
+				} else {
+					contactMap[item.JID] = item
+				}
+			}
+		}
+	}
+
+	queryLower := strings.ToLower(query)
+	var result []types.ContactItem
+	for _, item := range contactMap {
+		if queryLower != "" {
+			match := strings.Contains(strings.ToLower(item.JID), queryLower) ||
+				strings.Contains(strings.ToLower(item.FullName), queryLower) ||
+				strings.Contains(strings.ToLower(item.FirstName), queryLower) ||
+				strings.Contains(strings.ToLower(item.PushName), queryLower) ||
+				strings.Contains(strings.ToLower(item.BusinessName), queryLower)
+			if !match {
+				continue
+			}
+		}
+		result = append(result, item)
+	}
+
+	return result, nil
+}
+
 // Logout logs out the current session and clears state.
 func (c *Client) Logout(ctx context.Context) error {
 	c.mu.Lock()
@@ -433,6 +620,57 @@ func (c *Client) DownloadMedia(ctx context.Context, messageID string) (string, e
 func (c *Client) handleWAEvent(rawEvt any) {
 	switch evt := rawEvt.(type) {
 	case *events.Message:
+		if pm := evt.Message.GetProtocolMessage(); pm != nil {
+			if pm.GetType() == waE2E.ProtocolMessage_REVOKE {
+				revokedID := pm.GetKey().GetID()
+				if c.historyStore != nil {
+					_ = c.historyStore.MarkRevoked(context.Background(), revokedID)
+				}
+				if c.eventHandler != nil {
+					c.eventHandler(types.EventNotification{
+						Event: "message_revoke",
+						Data:  map[string]string{"message_id": revokedID, "chat": evt.Info.Chat.String()},
+					})
+				}
+				return
+			} else if pm.GetType() == waE2E.ProtocolMessage_MESSAGE_EDIT {
+				editedID := pm.GetKey().GetID()
+				editedText := ""
+				if pm.GetEditedMessage() != nil {
+					if conv := pm.GetEditedMessage().GetConversation(); conv != "" {
+						editedText = conv
+					} else if ext := pm.GetEditedMessage().GetExtendedTextMessage(); ext != nil {
+						editedText = ext.GetText()
+					}
+				}
+				if c.historyStore != nil {
+					_ = c.historyStore.UpdateMessageText(context.Background(), editedID, editedText, true)
+				}
+				if c.eventHandler != nil {
+					c.eventHandler(types.EventNotification{
+						Event: "message_edit",
+						Data:  map[string]string{"message_id": editedID, "chat": evt.Info.Chat.String(), "new_text": editedText},
+					})
+				}
+				return
+			}
+		}
+
+		if evt.Message.GetReactionMessage() != nil {
+			reaction := evt.Message.GetReactionMessage()
+			if c.eventHandler != nil {
+				c.eventHandler(types.EventNotification{
+					Event: "reaction",
+					Data: map[string]any{
+						"message_id": reaction.GetKey().GetID(),
+						"sender":     evt.Info.Sender.String(),
+						"emoji":      reaction.GetText(),
+					},
+				})
+			}
+			return
+		}
+
 		data, ok := c.extractMessageData(evt)
 		if ok {
 			if c.historyStore != nil {
@@ -474,6 +712,57 @@ func (c *Client) handleWAEvent(rawEvt any) {
 					}
 				}
 			}
+		}
+		receiptType := "delivered"
+		switch evt.Type {
+		case waTypes.ReceiptTypeRead, waTypes.ReceiptTypeReadSelf:
+			receiptType = "read"
+		case waTypes.ReceiptTypePlayed:
+			receiptType = "played"
+		}
+		for _, id := range evt.MessageIDs {
+			if c.eventHandler != nil {
+				c.eventHandler(types.EventNotification{
+					Event: "receipt",
+					Data: map[string]any{
+						"message_id": string(id),
+						"chat":       evt.Chat.String(),
+						"sender":     evt.Sender.String(),
+						"type":       receiptType,
+						"timestamp":  evt.Timestamp,
+					},
+				})
+			}
+		}
+	case *events.Presence:
+		if c.eventHandler != nil {
+			state := "available"
+			if evt.Unavailable {
+				state = "unavailable"
+			}
+			c.eventHandler(types.EventNotification{
+				Event: "presence",
+				Data: map[string]any{
+					"sender":    evt.From.String(),
+					"state":     state,
+					"last_seen": evt.LastSeen,
+				},
+			})
+		}
+	case *events.ChatPresence:
+		if c.eventHandler != nil {
+			state := string(evt.State)
+			if evt.State == waTypes.ChatPresenceComposing && evt.Media == waTypes.ChatPresenceMediaAudio {
+				state = "recording"
+			}
+			c.eventHandler(types.EventNotification{
+				Event: "presence",
+				Data: map[string]any{
+					"sender": evt.Sender.String(),
+					"chat":   evt.Chat.String(),
+					"state":  state,
+				},
+			})
 		}
 	case *events.HistorySync:
 		if c.historyStore != nil {
