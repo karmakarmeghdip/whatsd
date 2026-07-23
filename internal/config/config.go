@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 // Config contains runtime directory and file paths for whatsd.
 type Config struct {
@@ -47,7 +50,7 @@ func LoadConfig() Config {
 func (c *Config) EnsureDirectories() error {
 	for _, dir := range []string{c.DataDir, c.StateDir, c.RuntimeDir} {
 		if err := os.MkdirAll(dir, 0700); err != nil {
-			return err
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
 	return nil

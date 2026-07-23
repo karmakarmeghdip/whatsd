@@ -17,6 +17,65 @@ import (
 	"whatsd/internal/types"
 )
 
+// GetContacts queries synced device contacts and history chats matching an optional query string.
+func (c *Client) GetContacts(ctx context.Context, query string) ([]types.ContactItem, error) {
+	c.mu.RLock()
+	waClient := c.waClient
+	hStore := c.historyStore
+	c.mu.RUnlock()
+
+	contactMap := make(map[string]types.ContactItem)
+
+	if waClient != nil && waClient.Store != nil && waClient.Store.Contacts != nil {
+		contacts, err := waClient.Store.Contacts.GetAllContacts(ctx)
+		if err == nil {
+			for jid, info := range contacts {
+				contactMap[jid.String()] = types.ContactItem{
+					JID:          jid.String(),
+					FirstName:    info.FirstName,
+					FullName:     info.FullName,
+					PushName:     info.PushName,
+					BusinessName: info.BusinessName,
+				}
+			}
+		}
+	}
+
+	if hStore != nil {
+		chatContacts, err := hStore.GetContactsFromChats(ctx)
+		if err == nil {
+			for _, item := range chatContacts {
+				if existing, found := contactMap[item.JID]; found {
+					if existing.FullName == "" {
+						existing.FullName = item.FullName
+						contactMap[item.JID] = existing
+					}
+				} else {
+					contactMap[item.JID] = item
+				}
+			}
+		}
+	}
+
+	queryLower := strings.ToLower(query)
+	var result []types.ContactItem
+	for _, item := range contactMap {
+		if queryLower != "" {
+			match := strings.Contains(strings.ToLower(item.JID), queryLower) ||
+				strings.Contains(strings.ToLower(item.FullName), queryLower) ||
+				strings.Contains(strings.ToLower(item.FirstName), queryLower) ||
+				strings.Contains(strings.ToLower(item.PushName), queryLower) ||
+				strings.Contains(strings.ToLower(item.BusinessName), queryLower)
+			if !match {
+				continue
+			}
+		}
+		result = append(result, item)
+	}
+
+	return result, nil
+}
+
 // GetContact queries contact details, WhatsApp registration, status text, and verified business info.
 func (c *Client) GetContact(ctx context.Context, jidStr string) (*types.ContactInfoResult, error) {
 	uJID, err := parseUserJID(jidStr)
