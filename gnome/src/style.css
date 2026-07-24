@@ -1,0 +1,76 @@
+/* custom styles for whatsd GNOME app */
+
+.chat-avatar-pill {
+    background-color: alpha(@accent_color, 0.2);
+    color: @accent_color;
+    border-radius: 9999px;
+    font-weight: bold;
+    font-size: 13px;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0;
+}
+
+.chat-unread-badge {
+    background-color: @accent_bg_color;
+    color: @accent_fg_color;
+    border-radius: 9999px;
+    font-weight: bold;
+    font-size: 11px;
+    padding: 2px 7px;
+    min-width: 18px;
+}
+
+.chat-title-text {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.chat-preview-text {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.chat-timestamp-text {
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.message-bubble-outgoing {
+    background-color: alpha(@accent_color, 0.18);
+    border-radius: 14px 14px 2px 14px;
+    padding: 8px 12px;
+    margin-left: 48px;
+    margin-right: 4px;
+}
+
+.message-bubble-incoming {
+    background-color: alpha(@card_shade_color, 0.6);
+    border-radius: 14px 14px 14px 2px;
+    padding: 8px 12px;
+    margin-left: 4px;
+    margin-right: 48px;
+}
+
+.message-sender-name {
+    font-weight: bold;
+    font-size: 11px;
+    color: @accent_color;
+    margin-bottom: 2px;
+}
+
+.message-text {
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.message-time-stamp {
+    font-size: 10px;
+    opacity: 0.55;
+    margin-top: 4px;
+}
+
+.status-banner-info {
+    font-size: 12px;
+    padding: 4px 8px;
+}

@@ -1,0 +1,124 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $MainWindow : Adw.ApplicationWindow {
+  default-width: 980;
+  default-height: 660;
+  title: _("WhatsApp Desktop");
+
+  content: Adw.NavigationSplitView splitView {
+    sidebar: Adw.NavigationPage {
+      title: _("Chats");
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar {
+          title-widget: Adw.WindowTitle {
+            title: _("WhatsApp Desktop");
+          };
+
+          [end]
+          Gtk.MenuButton menuButton {
+            icon-name: "open-menu-symbolic";
+            primary: true;
+          }
+        }
+
+        content: Gtk.Box {
+          orientation: vertical;
+
+          Gtk.SearchEntry searchEntry {
+            margin-top: 6;
+            margin-bottom: 6;
+            margin-start: 6;
+            margin-end: 6;
+            placeholder-text: _("Search conversations…");
+          }
+
+          Gtk.ScrolledWindow {
+            vexpand: true;
+            hscrollbar-policy: never;
+
+            Gtk.ListBox sidebarList {
+              selection-mode: single;
+              styles [
+                "navigation-sidebar",
+              ]
+            }
+          }
+        };
+      };
+    };
+
+    content: Adw.NavigationPage {
+      title: _("Conversation");
+      child: Adw.ToolbarView {
+        [top]
+        Adw.HeaderBar contentHeader {
+          title-widget: Adw.WindowTitle chatTitle {
+            title: _("Select a Conversation");
+          };
+
+          [end]
+          Gtk.Button infoButton {
+            icon-name: "dialog-information-symbolic";
+            tooltip-text: _("Contact Information");
+            sensitive: false;
+          }
+        }
+
+        content: Gtk.Stack contentStack {
+          Adw.StatusPage emptyPage {
+            icon-name: "chat-message-new-symbolic";
+            title: _("No Conversation Selected");
+            description: _("Select a conversation from the sidebar list to view messages and chat.");
+          }
+
+          Gtk.Box chatViewBox {
+            orientation: vertical;
+
+            Gtk.ScrolledWindow messageScroll {
+              vexpand: true;
+              hscrollbar-policy: never;
+
+              Gtk.Box messageList {
+                orientation: vertical;
+                spacing: 8;
+                margin-top: 12;
+                margin-bottom: 12;
+                margin-start: 12;
+                margin-end: 12;
+              }
+            }
+
+            Gtk.Box composerBox {
+              orientation: horizontal;
+              spacing: 6;
+              margin-top: 6;
+              margin-bottom: 6;
+              margin-start: 6;
+              margin-end: 6;
+
+              Gtk.Button attachButton {
+                icon-name: "mail-attachment-symbolic";
+                tooltip-text: _("Attach file");
+              }
+
+              Gtk.Entry messageEntry {
+                hexpand: true;
+                placeholder-text: _("Type a message…");
+              }
+
+              Gtk.Button sendButton {
+                icon-name: "mail-send-symbolic";
+                tooltip-text: _("Send message");
+                styles [
+                  "suggested-action",
+                ]
+              }
+            }
+          }
+        };
+      };
+    };
+  };
+}
